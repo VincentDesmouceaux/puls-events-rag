@@ -355,6 +355,17 @@ release/*
 main
 ```
 
+## Compatibilité avec les imports du sujet
+
+Le sujet pédagogique présente les imports historiques suivants :
+
+```python
+import faiss
+
+from langchain.vectorstores import FAISS
+from langchain.embeddings import HuggingFaceEmbeddings
+from mistral import MistralClient
+
 ## État actuel
 
 L'étape de configuration de l'environnement permet actuellement de :
