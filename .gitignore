@@ -8,6 +8,7 @@ __pycache__/
 # Environment variables / secrets
 .env
 .env.*
+!.env.example
 
 # PyCharm
 .idea/
@@ -19,3 +20,5 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
+MISTRAL_API_KEY=ShEdys1234,
