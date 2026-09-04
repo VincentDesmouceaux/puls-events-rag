@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 
 from app.schemas import AskRequest, AskResponse
+from scripts.build_faiss_index import main as rebuild_faiss_index
 from scripts.rag_chain import answer_question
 
 
@@ -48,3 +49,24 @@ def ask(request: AskRequest) -> AskResponse:
         question=request.question,
         answer=answer,
     )
+
+
+@app.post(
+    "/rebuild",
+    tags=["Index"],
+    summary="Reconstruit la base vectorielle FAISS",
+)
+def rebuild() -> dict:
+    """Recharge les événements et reconstruit l'index FAISS."""
+    try:
+        rebuild_faiss_index()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Impossible de reconstruire l'index FAISS.",
+        ) from exc
+
+    return {
+        "status": "ok",
+        "message": "Index FAISS reconstruit avec succès.",
+    }
