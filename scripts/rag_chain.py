@@ -18,7 +18,7 @@ def get_llm() -> ChatMistralAI:
         raise RuntimeError("MISTRAL_API_KEY is missing")
 
     return ChatMistralAI(
-        model="mistral-small-latest",
+        model="ministral-3b-latest",
         api_key=api_key,
         temperature=0.2,
     )
