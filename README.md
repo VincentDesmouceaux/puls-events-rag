@@ -383,3 +383,92 @@ L'étape de configuration de l'environnement permet actuellement de :
 ## Prochaine étape
 
 La prochaine phase du projet consistera à récupérer, analyser et préparer les données culturelles provenant de l'API Open Agenda avant leur transformation en représentations vectorielles.
+
+## Exercice 2 — Collecte, filtrage et vectorisation OpenAgenda
+
+Cette étape prépare les données événementielles utilisées par le futur système RAG.
+
+### Source des données
+
+Les événements sont récupérés depuis l'API OpenAgenda.
+
+- Zone géographique : Paris
+- Agenda utilisé : JASS CLUB PARIS
+- UID OpenAgenda : `20272888`
+- Pagination : récupération de l'ensemble des pages disponibles
+- Format intermédiaire : `pandas.DataFrame`
+
+### Filtrage
+
+Les événements sont filtrés selon :
+
+- la ville : `Paris`
+- une période couvrant les 365 derniers jours
+- tous les événements futurs disponibles
+
+Les dates sont converties en UTC afin de garantir un filtrage temporel cohérent.
+
+### Normalisation
+
+Pour chaque événement, les champs suivants sont structurés :
+
+- `uid`
+- `title`
+- `description`
+- `city`
+- `address`
+- `latitude`
+- `longitude`
+- `start_date`
+- `end_date`
+- `date_range`
+- `keywords`
+- `status`
+
+Une représentation textuelle dédiée aux embeddings est ensuite construite dans le champ :
+
+- `embedding_text`
+
+Elle regroupe le titre, la description, le lieu, la date et les mots-clés de l'événement.
+
+### Vectorisation
+
+Les représentations vectorielles sont générées avec :
+
+- fournisseur : Mistral AI
+- modèle : `mistral-embed`
+- dimension d'un embedding : `1024`
+
+Les embeddings sont générés par lots afin de pouvoir traiter l'ensemble du jeu de données.
+
+Lors du test du pipeline, 306 événements OpenAgenda ont été récupérés, filtrés et vectorisés.
+
+### Fichiers générés
+
+Le pipeline peut générer notamment :
+
+`data/processed/openagenda_events.jsonl`
+
+et :
+
+`data/processed/openagenda_events_vectorized.jsonl`
+
+Ces fichiers sont des artefacts générés et ne sont pas versionnés dans Git.
+
+### Tests
+
+Les traitements OpenAgenda disposent de tests unitaires couvrant notamment :
+
+- la normalisation des événements
+- les données manquantes
+- le filtrage géographique et temporel
+- la création du texte destiné aux embeddings
+- la sauvegarde JSONL
+- la génération des embeddings
+- la pagination de l'API OpenAgenda
+
+État actuel :
+
+`8 passed`
+
+Le jeu de données obtenu est ainsi propre, structuré et prêt pour l'étape suivante : son indexation dans une base vectorielle.

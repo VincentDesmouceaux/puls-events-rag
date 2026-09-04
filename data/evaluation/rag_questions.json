@@ -1,0 +1,116 @@
+[
+  {
+    "id": 1,
+    "question": "Je cherche un événement jazz à Paris.",
+    "expected_intent": "jazz",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "jazz"
+    ],
+    "expected_facts": [
+      "TANA JAZZ NIGHT",
+      "141 Rue de Tolbiac",
+      "2026"
+    ],
+    "reference_answer": "Je peux recommander TANA JAZZ NIGHT, une jam session jazz organisée au 141 Rue de Tolbiac à Paris en 2026.",
+    "evaluation": null
+  },
+  {
+    "id": 2,
+    "question": "Peux-tu me proposer une jam session à Paris ?",
+    "expected_intent": "jam session",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "jam"
+    ],
+    "expected_facts": [
+      "Échecs & Jam",
+      "141 Rue de Tolbiac",
+      "2026"
+    ],
+    "reference_answer": "Une jam session disponible est Échecs & Jam, organisée au 141 Rue de Tolbiac à Paris en 2026.",
+    "evaluation": null
+  },
+  {
+    "id": 3,
+    "question": "Je cherche une soirée swing à Paris.",
+    "expected_intent": "swing",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "swing"
+    ],
+    "expected_facts": [
+      "Soirée jazz manouche & swing",
+      "141 Rue de Tolbiac",
+      "2026"
+    ],
+    "reference_answer": "La Soirée jazz manouche & swing par Alba Obert correspond à cette recherche. Elle se déroule au 141 Rue de Tolbiac à Paris en 2026.",
+    "evaluation": null
+  },
+  {
+    "id": 4,
+    "question": "Y a-t-il un événement jazz manouche à Paris ?",
+    "expected_intent": "jazz manouche",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "manouche"
+    ],
+    "expected_facts": [
+      "Django",
+      "jazz manouche",
+      "141 Rue de Tolbiac"
+    ],
+    "reference_answer": "Des événements de jazz manouche sont disponibles au 141 Rue de Tolbiac à Paris, notamment des soirées autour de Django Reinhardt.",
+    "evaluation": null
+  },
+  {
+    "id": 5,
+    "question": "Je voudrais découvrir un concert de jazz autour du cinéma.",
+    "expected_intent": "ciné-jazz",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "jazz",
+      "cinéma"
+    ],
+    "expected_facts": [
+      "CINÉ-JAZZ",
+      "1 août 2026",
+      "141 Rue de Tolbiac"
+    ],
+    "reference_answer": "CINÉ-JAZZ : les thèmes légendaires du grand écran correspond à cette demande. L'événement a lieu le 1 août 2026 au 141 Rue de Tolbiac à Paris.",
+    "evaluation": null
+  },
+  {
+    "id": 6,
+    "question": "Quels événements jazz ont lieu rue de Tolbiac ?",
+    "expected_intent": "jazz",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Tolbiac",
+      "jazz"
+    ],
+    "expected_facts": [
+      "141 Rue de Tolbiac",
+      "Paris",
+      "Zoot Sundays"
+    ],
+    "reference_answer": "Plusieurs événements jazz ont lieu au 141 Rue de Tolbiac à Paris, notamment les sessions Zoot Sundays.",
+    "evaluation": null
+  },
+  {
+    "id": 7,
+    "question": "Peux-tu me recommander une exposition de peinture à Lyon ?",
+    "expected_intent": "hors corpus",
+    "expected_city": "Lyon",
+    "expected_answer_contains": [
+      "aucun événement pertinent"
+    ],
+    "expected_facts": [],
+    "reference_answer": "Aucun événement pertinent n'a été trouvé dans le corpus disponible pour une exposition de peinture à Lyon.",
+    "evaluation": null
+  }
+]

@@ -187,6 +187,7 @@ numpy==2.5.2
     # via
     #   faiss-cpu
     #   langchain-community
+    #   pandas
     #   scikit-learn
     #   scipy
     #   sentence-transformers
@@ -253,6 +254,8 @@ packaging==26.3
     #   langsmith
     #   pytest
     #   transformers
+pandas==3.0.5
+    # via puls-events-rag
 pluggy==1.6.0
     # via
     #   pytest
@@ -284,7 +287,9 @@ pytest==9.1.1
     # via pytest-cov
 pytest-cov==7.1.0
 python-dateutil==2.9.0.post0
-    # via mistralai
+    # via
+    #   mistralai
+    #   pandas
 python-dotenv==1.2.3
     # via
     #   puls-events-rag
@@ -305,6 +310,7 @@ requests==2.34.2
     #   langchain-classic
     #   langchain-community
     #   langsmith
+    #   puls-events-rag
     #   requests-toolbelt
 requests-toolbelt==1.0.0
     # via langsmith
@@ -391,6 +397,8 @@ typing-inspection==0.4.4
     #   mistralai
     #   pydantic
     #   pydantic-settings
+tzdata==2026.3 ; sys_platform == 'emscripten' or sys_platform == 'win32'
+    # via pandas
 urllib3==2.7.0
     # via requests
 uuid-utils==0.17.0
