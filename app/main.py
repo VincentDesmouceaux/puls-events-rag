@@ -2,7 +2,10 @@ from fastapi import FastAPI, HTTPException
 
 from app.schemas import AskRequest, AskResponse
 from scripts.build_faiss_index import main as rebuild_faiss_index
-from scripts.rag_chain import answer_question
+from scripts.rag_chain import (
+    answer_question,
+    clear_retriever_cache,
+)
 
 
 app = FastAPI(
@@ -39,7 +42,25 @@ def ask(request: AskRequest) -> AskResponse:
     """Retourne une réponse augmentée à partir des événements FAISS."""
     try:
         answer = answer_question(request.question)
+
     except Exception as exc:
+        error_message = str(exc)
+
+        print(
+            f"Erreur RAG : "
+            f"{type(exc).__name__}: "
+            f"{error_message}"
+        )
+
+        if "429" in error_message or "Rate limit exceeded" in error_message:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Le service de génération est temporairement "
+                    "indisponible. Réessayez dans quelques instants."
+                ),
+            ) from exc
+
         raise HTTPException(
             status_code=500,
             detail="Impossible de générer une réponse RAG.",
@@ -60,7 +81,15 @@ def rebuild() -> dict:
     """Recharge les événements et reconstruit l'index FAISS."""
     try:
         rebuild_faiss_index()
+        clear_retriever_cache()
+
     except Exception as exc:
+        print(
+            f"Erreur rebuild : "
+            f"{type(exc).__name__}: "
+            f"{exc}"
+        )
+
         raise HTTPException(
             status_code=500,
             detail="Impossible de reconstruire l'index FAISS.",
