@@ -11,6 +11,14 @@ on:
       - develop
       - main
 
+  workflow_dispatch:
+    inputs:
+      rebuild_index:
+        description: "Rebuild FAISS production index"
+        required: false
+        type: boolean
+        default: false
+
 jobs:
   tests:
     name: Pytest
@@ -155,4 +163,46 @@ jobs:
             echo "- ✅ Northflank deployment"
             echo "- ✅ Production RAG request"
             echo "- ✅ API version: \`$EXPECTED_VERSION\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  rebuild_production_index:
+    name: Rebuild production FAISS index
+    runs-on: ubuntu-latest
+
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      inputs.rebuild_index == true
+
+    steps:
+      - name: Rebuild FAISS on Northflank
+        run: |
+          echo "Reconstruction de l'index FAISS en production..."
+
+          RESPONSE=$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            -X POST \
+            "https://p01--p9bot--wd4gpkqcrlm8.code.run/rebuild" \
+            -H "X-Rebuild-Key: ${{ secrets.REBUILD_API_KEY }}")
+
+          echo ""
+          echo "Réponse Northflank:"
+          echo "$RESPONSE"
+
+          echo "$RESPONSE" | grep -q '"status":"ok"' || {
+            echo "La reconstruction FAISS a échoué."
+            exit 1
+          }
+
+          {
+            echo "# 🔄 Puls-Events RAG — FAISS Rebuild"
+            echo ""
+            echo "✅ Reconstruction de l'index FAISS réussie."
+            echo ""
+            echo "Réponse API :"
+            echo ""
+            echo '```json'
+            echo "$RESPONSE"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
