@@ -89,9 +89,12 @@ jobs:
           exit 1
 
       - name: Ask production RAG bot
+        id: rag_demo
         run: |
+          QUESTION="Je cherche un événement jazz à Paris."
+
           echo "Question envoyée au bot:"
-          echo "Je cherche un événement jazz à Paris."
+          echo "$QUESTION"
 
           RESPONSE=$(curl \
             --fail \
@@ -100,7 +103,7 @@ jobs:
             -X POST \
             "https://p01--p9bot--wd4gpkqcrlm8.code.run/ask" \
             -H "Content-Type: application/json" \
-            -d '{"question":"Je cherche un événement jazz à Paris."}')
+            -d "{\"question\":\"$QUESTION\"}")
 
           echo ""
           echo "Réponse du bot Northflank:"
@@ -110,3 +113,46 @@ jobs:
             echo "La réponse du bot ne contient pas le champ answer."
             exit 1
           }
+
+          ANSWER=$(python -c '
+          import json
+          import sys
+
+          data = json.load(sys.stdin)
+          print(data["answer"])
+          ' <<< "$RESPONSE")
+
+          echo "question=$QUESTION" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "answer<<EOF"
+            echo "$ANSWER"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build production demo summary
+        run: |
+          EXPECTED_VERSION=$(grep '^version =' pyproject.toml | cut -d '"' -f2)
+
+          {
+            echo "# 🤖 Puls-Events RAG — Production Demo"
+            echo ""
+            echo "## Question"
+            echo ""
+            echo "${{ steps.rag_demo.outputs.question }}"
+            echo ""
+            echo "## Réponse du bot"
+            echo ""
+            echo "${{ steps.rag_demo.outputs.answer }}"
+            echo ""
+            echo "---"
+            echo ""
+            echo "### Validation"
+            echo ""
+            echo "- ✅ Pytest"
+            echo "- ✅ Docker build"
+            echo "- ✅ Docker smoke test"
+            echo "- ✅ Northflank deployment"
+            echo "- ✅ Production RAG request"
+            echo "- ✅ API version: \`$EXPECTED_VERSION\`"
+          } >> "$GITHUB_STEP_SUMMARY"
