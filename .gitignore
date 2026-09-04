@@ -22,3 +22,5 @@ __pycache__/
 htmlcov/
 
 MISTRAL_API_KEY=ShEdys1234,
+# Generated OpenAgenda datasets
+data/processed/*.jsonl

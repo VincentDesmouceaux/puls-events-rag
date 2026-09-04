@@ -12,6 +12,7 @@ dependencies = [
     "mistralai>=2.9.4",
     "pandas>=3.0.5",
     "python-dotenv>=1.2.3",
+    "requests>=2.34.2",
     "sentence-transformers>=6.0.1",
     "uvicorn[standard]>=0.52.4",
     "zvec>=0.7.0",

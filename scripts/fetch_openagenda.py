@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+from mistralai.client import Mistral
 
 
 load_dotenv()
@@ -93,7 +94,64 @@ def events_to_dataframe(events: list[dict]) -> pd.DataFrame:
     normalized_events = [normalize_event(event) for event in events]
 
     return pd.DataFrame(normalized_events)
+def add_embedding_text(df: pd.DataFrame) -> pd.DataFrame:
+    result = df.copy()
 
+    result["embedding_text"] = result.apply(
+        lambda row: (
+            f"Titre: {row['title']}\n"
+            f"Description: {row['description']}\n"
+            f"Lieu: {row['address']}, {row['city']}\n"
+            f"Date: {row['date_range']}\n"
+            f"Mots-clés: {', '.join(row['keywords'])}"
+        ),
+        axis=1,
+    )
+
+    return result
+def save_processed_events(
+    df: pd.DataFrame,
+    output_path: str = "data/processed/openagenda_events.jsonl",
+) -> None:
+    df.to_json(
+        output_path,
+        orient="records",
+        lines=True,
+        force_ascii=False,
+        date_format="iso",
+    )
+def add_mistral_embeddings(
+    df: pd.DataFrame,
+    batch_size: int = 32,
+) -> pd.DataFrame:
+    api_key = os.getenv("MISTRAL_API_KEY")
+
+    if not api_key:
+        raise RuntimeError("MISTRAL_API_KEY is missing")
+
+    client = Mistral(api_key=api_key)
+    result = df.copy()
+
+    embeddings = []
+
+    texts = result["embedding_text"].tolist()
+
+    for start in range(0, len(texts), batch_size):
+        batch = texts[start : start + batch_size]
+
+        response = client.embeddings.create(
+            model="mistral-embed",
+            inputs=batch,
+        )
+
+        embeddings.extend(
+            item.embedding
+            for item in response.data
+        )
+
+    result["embedding"] = embeddings
+
+    return result
 if __name__ == "__main__":
     data = fetch_agendas(size=10, search="Paris")
 
