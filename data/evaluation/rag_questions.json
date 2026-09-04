@@ -1,0 +1,68 @@
+[
+  {
+    "id": 1,
+    "question": "Je cherche un événement jazz à Paris.",
+    "expected_intent": "jazz",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "jazz"
+    ],
+    "evaluation": null
+  },
+  {
+    "id": 2,
+    "question": "Peux-tu me proposer une jam session à Paris ?",
+    "expected_intent": "jam session",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "jam"
+    ],
+    "evaluation": null
+  },
+  {
+    "id": 3,
+    "question": "Je cherche une soirée swing à Paris.",
+    "expected_intent": "swing",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "swing"
+    ],
+    "evaluation": null
+  },
+  {
+    "id": 4,
+    "question": "Y a-t-il un événement jazz manouche à Paris ?",
+    "expected_intent": "jazz manouche",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Paris",
+      "manouche"
+    ],
+    "evaluation": null
+  },
+  {
+    "id": 5,
+    "question": "Je voudrais découvrir un concert de jazz autour du cinéma.",
+    "expected_intent": "ciné-jazz",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "jazz",
+      "cinéma"
+    ],
+    "evaluation": null
+  },
+  {
+    "id": 6,
+    "question": "Quels événements jazz ont lieu rue de Tolbiac ?",
+    "expected_intent": "jazz",
+    "expected_city": "Paris",
+    "expected_answer_contains": [
+      "Tolbiac",
+      "jazz"
+    ],
+    "evaluation": null
+  }
+]
