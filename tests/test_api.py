@@ -6,6 +6,15 @@ import app.main as main_module
 client = TestClient(main_module.app)
 
 
+def reset_rebuild_state() -> None:
+    """Réinitialise l'état du rebuild entre les tests."""
+    with main_module.rebuild_lock:
+        main_module.rebuild_state["status"] = "idle"
+        main_module.rebuild_state["started_at"] = None
+        main_module.rebuild_state["completed_at"] = None
+        main_module.rebuild_state["error"] = None
+
+
 def test_health_endpoint() -> None:
     """Vérifie que l'API répond correctement sur /health."""
     response = client.get("/health")
@@ -14,7 +23,7 @@ def test_health_endpoint() -> None:
     assert response.json() == {
         "status": "ok",
         "service": "puls-events-rag-api",
-        "version": "0.2.1",
+        "version": "0.2.2",
     }
 
 
@@ -120,6 +129,8 @@ def test_ask_internal_error_returns_500(monkeypatch) -> None:
 
 def test_rebuild_without_key_returns_401(monkeypatch) -> None:
     """Vérifie que /rebuild refuse une requête sans clé."""
+    reset_rebuild_state()
+
     monkeypatch.setenv(
         "REBUILD_API_KEY",
         "test-secret-key",
@@ -135,6 +146,8 @@ def test_rebuild_without_key_returns_401(monkeypatch) -> None:
 
 def test_rebuild_with_invalid_key_returns_401(monkeypatch) -> None:
     """Vérifie que /rebuild refuse une mauvaise clé."""
+    reset_rebuild_state()
+
     monkeypatch.setenv(
         "REBUILD_API_KEY",
         "test-secret-key",
@@ -157,6 +170,8 @@ def test_rebuild_without_configuration_returns_503(
     monkeypatch,
 ) -> None:
     """Vérifie le refus si la clé serveur n'est pas configurée."""
+    reset_rebuild_state()
+
     monkeypatch.delenv(
         "REBUILD_API_KEY",
         raising=False,
@@ -179,7 +194,9 @@ def test_rebuild_without_configuration_returns_503(
 
 
 def test_rebuild_success(monkeypatch) -> None:
-    """Vérifie une reconstruction simulée avec une clé valide."""
+    """Vérifie le lancement et la réussite du rebuild background."""
+    reset_rebuild_state()
+
     monkeypatch.setenv(
         "REBUILD_API_KEY",
         "test-secret-key",
@@ -214,18 +231,35 @@ def test_rebuild_success(monkeypatch) -> None:
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert response.json() == {
-        "status": "ok",
-        "message": "Index FAISS reconstruit avec succès.",
+        "status": "accepted",
+        "message": (
+            "Reconstruction FAISS lancée en arrière-plan."
+        ),
     }
 
     assert calls["rebuild"] is True
     assert calls["clear_cache"] is True
 
+    status_response = client.get("/rebuild/status")
 
-def test_rebuild_internal_error_returns_500(monkeypatch) -> None:
-    """Vérifie la gestion d'une erreur pendant le rebuild."""
+    assert status_response.status_code == 200
+
+    data = status_response.json()
+
+    assert data["status"] == "completed"
+    assert data["started_at"] is not None
+    assert data["completed_at"] is not None
+    assert data["error"] is None
+
+
+def test_rebuild_background_error_is_reported(
+    monkeypatch,
+) -> None:
+    """Vérifie qu'une erreur background apparaît dans le statut."""
+    reset_rebuild_state()
+
     monkeypatch.setenv(
         "REBUILD_API_KEY",
         "test-secret-key",
@@ -247,7 +281,62 @@ def test_rebuild_internal_error_returns_500(monkeypatch) -> None:
         },
     )
 
-    assert response.status_code == 500
+    assert response.status_code == 202
+
+    status_response = client.get("/rebuild/status")
+
+    assert status_response.status_code == 200
+
+    data = status_response.json()
+
+    assert data["status"] == "failed"
+    assert data["started_at"] is not None
+    assert data["completed_at"] is not None
+    assert data["error"] == "Erreur rebuild simulée"
+
+
+def test_rebuild_status_idle() -> None:
+    """Vérifie le statut initial du système de reconstruction."""
+    reset_rebuild_state()
+
+    response = client.get("/rebuild/status")
+
+    assert response.status_code == 200
     assert response.json() == {
-        "detail": "Impossible de reconstruire l'index FAISS."
+        "status": "idle",
+        "started_at": None,
+        "completed_at": None,
+        "error": None,
     }
+
+
+def test_rebuild_already_running_returns_409(
+    monkeypatch,
+) -> None:
+    """Vérifie qu'un second rebuild simultané est refusé."""
+    reset_rebuild_state()
+
+    monkeypatch.setenv(
+        "REBUILD_API_KEY",
+        "test-secret-key",
+    )
+
+    with main_module.rebuild_lock:
+        main_module.rebuild_state["status"] = "running"
+        main_module.rebuild_state["started_at"] = (
+            "2026-09-04T12:00:00+00:00"
+        )
+
+    response = client.post(
+        "/rebuild",
+        headers={
+            "X-Rebuild-Key": "test-secret-key",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Une reconstruction FAISS est déjà en cours."
+    }
+
+    reset_rebuild_state()
