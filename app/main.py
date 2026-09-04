@@ -1,7 +1,15 @@
 import os
 import secrets
+from datetime import datetime, timezone
+from threading import Lock
 
-from fastapi import FastAPI, HTTPException, Security
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    HTTPException,
+    Security,
+    status,
+)
 from fastapi.security import APIKeyHeader
 
 from app.schemas import AskRequest, AskResponse
@@ -18,7 +26,7 @@ app = FastAPI(
         "API REST exposant le système RAG "
         "de recommandation d'événements."
     ),
-    version="0.2.2",
+    version="0.2.3",
 )
 
 
@@ -26,6 +34,21 @@ rebuild_api_key_header = APIKeyHeader(
     name="X-Rebuild-Key",
     auto_error=False,
 )
+
+
+rebuild_lock = Lock()
+
+rebuild_state = {
+    "status": "idle",
+    "started_at": None,
+    "completed_at": None,
+    "error": None,
+}
+
+
+def utc_now() -> str:
+    """Retourne la date UTC actuelle au format ISO."""
+    return datetime.now(timezone.utc).isoformat()
 
 
 def verify_rebuild_api_key(
@@ -37,7 +60,10 @@ def verify_rebuild_api_key(
     if not expected_api_key:
         raise HTTPException(
             status_code=503,
-            detail="La protection de l'endpoint rebuild n'est pas configurée.",
+            detail=(
+                "La protection de l'endpoint rebuild "
+                "n'est pas configurée."
+            ),
         )
 
     if not api_key or not secrets.compare_digest(
@@ -47,6 +73,32 @@ def verify_rebuild_api_key(
         raise HTTPException(
             status_code=401,
             detail="Clé d'accès invalide.",
+        )
+
+
+def run_faiss_rebuild() -> None:
+    """Reconstruit FAISS en arrière-plan et met à jour son état."""
+    try:
+        rebuild_faiss_index()
+        clear_retriever_cache()
+
+        with rebuild_lock:
+            rebuild_state["status"] = "completed"
+            rebuild_state["completed_at"] = utc_now()
+            rebuild_state["error"] = None
+
+        print("Rebuild FAISS terminé avec succès.")
+
+    except Exception as exc:
+        with rebuild_lock:
+            rebuild_state["status"] = "failed"
+            rebuild_state["completed_at"] = utc_now()
+            rebuild_state["error"] = str(exc)
+
+        print(
+            f"Erreur rebuild : "
+            f"{type(exc).__name__}: "
+            f"{exc}"
         )
 
 
@@ -60,7 +112,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "service": "puls-events-rag-api",
-        "version": "0.2.2",
+        "version": "0.2.3",
     }
 
 
@@ -74,7 +126,9 @@ def health() -> dict:
             "description": "Erreur interne du système RAG.",
         },
         503: {
-            "description": "Service de génération temporairement indisponible.",
+            "description": (
+                "Service de génération temporairement indisponible."
+            ),
         },
     },
 )
@@ -118,41 +172,58 @@ def ask(request: AskRequest) -> AskResponse:
 @app.post(
     "/rebuild",
     tags=["Index"],
-    summary="Reconstruit la base vectorielle FAISS",
+    summary="Lance la reconstruction de FAISS en arrière-plan",
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[
         Security(verify_rebuild_api_key),
     ],
     responses={
+        202: {
+            "description": "Reconstruction lancée en arrière-plan.",
+        },
         401: {
             "description": "Clé d'accès absente ou invalide.",
         },
-        500: {
-            "description": "Erreur lors de la reconstruction de FAISS.",
+        409: {
+            "description": "Une reconstruction est déjà en cours.",
         },
         503: {
             "description": "Configuration de sécurité indisponible.",
         },
     },
 )
-def rebuild() -> dict:
-    """Recharge les événements et reconstruit l'index FAISS."""
-    try:
-        rebuild_faiss_index()
-        clear_retriever_cache()
+def rebuild(
+    background_tasks: BackgroundTasks,
+) -> dict:
+    """Programme une reconstruction FAISS sans bloquer la requête."""
+    with rebuild_lock:
+        if rebuild_state["status"] == "running":
+            raise HTTPException(
+                status_code=409,
+                detail="Une reconstruction FAISS est déjà en cours.",
+            )
 
-    except Exception as exc:
-        print(
-            f"Erreur rebuild : "
-            f"{type(exc).__name__}: "
-            f"{exc}"
-        )
+        rebuild_state["status"] = "running"
+        rebuild_state["started_at"] = utc_now()
+        rebuild_state["completed_at"] = None
+        rebuild_state["error"] = None
 
-        raise HTTPException(
-            status_code=500,
-            detail="Impossible de reconstruire l'index FAISS.",
-        ) from exc
+    background_tasks.add_task(run_faiss_rebuild)
 
     return {
-        "status": "ok",
-        "message": "Index FAISS reconstruit avec succès.",
+        "status": "accepted",
+        "message": (
+            "Reconstruction FAISS lancée en arrière-plan."
+        ),
     }
+
+
+@app.get(
+    "/rebuild/status",
+    tags=["Index"],
+    summary="Consulte l'état de la reconstruction FAISS",
+)
+def rebuild_status() -> dict:
+    """Retourne l'état courant de la reconstruction FAISS."""
+    with rebuild_lock:
+        return dict(rebuild_state)
