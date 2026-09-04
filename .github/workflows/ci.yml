@@ -1,4 +1,4 @@
-name: CI - Tests and Docker
+name: CI - Tests, Docker and Production Bot
 
 on:
   push:
@@ -52,3 +52,61 @@ jobs:
             --entrypoint /app/.venv/bin/python \
             puls-events-rag:ci \
             -c "import app.main; print('Docker smoke test OK')"
+
+  production_bot:
+    name: Production bot request
+    runs-on: ubuntu-latest
+    needs: docker
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for Northflank deployment
+        run: |
+          EXPECTED_VERSION=$(grep '^version =' pyproject.toml | cut -d '"' -f2)
+
+          echo "Expected version: $EXPECTED_VERSION"
+
+          for attempt in {1..20}; do
+            RESPONSE=$(curl -s \
+              "https://p01--p9bot--wd4gpkqcrlm8.code.run/health" \
+              || true)
+
+            echo "Attempt $attempt: $RESPONSE"
+
+            if echo "$RESPONSE" | grep -q "\"version\":\"$EXPECTED_VERSION\""; then
+              echo "Northflank deployment is ready."
+              exit 0
+            fi
+
+            sleep 15
+          done
+
+          echo "Northflank did not deploy the expected version in time."
+          exit 1
+
+      - name: Ask production RAG bot
+        run: |
+          echo "Question envoyée au bot:"
+          echo "Je cherche un événement jazz à Paris."
+
+          RESPONSE=$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            -X POST \
+            "https://p01--p9bot--wd4gpkqcrlm8.code.run/ask" \
+            -H "Content-Type: application/json" \
+            -d '{"question":"Je cherche un événement jazz à Paris."}')
+
+          echo ""
+          echo "Réponse du bot Northflank:"
+          echo "$RESPONSE"
+
+          echo "$RESPONSE" | grep -q '"answer"' || {
+            echo "La réponse du bot ne contient pas le champ answer."
+            exit 1
+          }
