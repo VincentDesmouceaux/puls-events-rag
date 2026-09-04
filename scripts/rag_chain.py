@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
@@ -23,13 +24,19 @@ def get_llm() -> ChatMistralAI:
     )
 
 
+@lru_cache(maxsize=8)
 def get_retriever(k: int = 5):
-    """Recharge FAISS et expose un retriever LangChain."""
+    """Recharge FAISS une seule fois par valeur de k."""
     index = load_faiss_index()
 
     return index.as_retriever(
         search_kwargs={"k": k},
     )
+
+
+def clear_retriever_cache() -> None:
+    """Vide le cache FAISS après reconstruction de l'index."""
+    get_retriever.cache_clear()
 
 
 def format_documents(documents) -> str:
