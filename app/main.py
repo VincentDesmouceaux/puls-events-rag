@@ -26,7 +26,7 @@ app = FastAPI(
         "API REST exposant le système RAG "
         "de recommandation d'événements."
     ),
-    version="0.2.2",
+    version="0.2.3",
 )
 
 
@@ -112,7 +112,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "service": "puls-events-rag-api",
-        "version": "0.2.2",
+        "version": "0.2.3",
     }
 
 

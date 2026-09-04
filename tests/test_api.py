@@ -23,7 +23,7 @@ def test_health_endpoint() -> None:
     assert response.json() == {
         "status": "ok",
         "service": "puls-events-rag-api",
-        "version": "0.2.2",
+        "version": "0.2.3",
     }
 
 
