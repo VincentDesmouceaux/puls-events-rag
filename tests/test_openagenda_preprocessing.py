@@ -4,16 +4,6 @@ from types import SimpleNamespace
 import pandas as pd
 
 import scripts.fetch_openagenda as openagenda
-from scripts.fetch_openagenda import (
-    add_embedding_text,
-    add_mistral_embeddings,
-    chunk_events,
-    events_to_dataframe,
-    fetch_all_events,
-    filter_events,
-    normalize_event,
-    save_processed_events,
-)
 
 
 def test_normalize_event():
@@ -33,8 +23,12 @@ def test_normalize_event():
         "lastTiming": {
             "end": "2026-09-04T22:00:00+02:00",
         },
-        "dateRange": {"fr": "Vendredi 4 septembre"},
-        "keywords": {"fr": ["Jazz", "Concert"]},
+        "dateRange": {
+            "fr": "Vendredi 4 septembre",
+        },
+        "keywords": {
+            "fr": ["Jazz", "Concert"],
+        },
         "status": 1,
     }
 
@@ -235,6 +229,7 @@ def test_fetch_all_events_pagination(monkeypatch):
         )
 
         call_count += 1
+
         return response
 
     monkeypatch.setenv(
@@ -259,29 +254,38 @@ def test_fetch_all_events_pagination(monkeypatch):
     ]
 
     assert call_count == 2
+
+
 def test_chunk_events():
     df = pd.DataFrame(
         [
             {
                 "uid": 1,
                 "title": "Événement test",
+                "description": "Description de l'événement test",
                 "city": "Paris",
                 "address": "1 rue de Paris",
                 "start_date": "2026-09-04T18:00:00Z",
                 "end_date": "2026-09-04T20:00:00Z",
+                "date_range": "4 septembre 2026 de 18h à 20h",
                 "keywords": ["Jazz"],
                 "embedding_text": "A" * 1200,
             }
         ]
     )
 
-    chunks = chunk_events(
+    chunks = openagenda.chunk_events(
         df,
         chunk_size=500,
         chunk_overlap=50,
     )
 
     assert len(chunks) > 1
-    assert all(chunk["uid"] == 1 for chunk in chunks)
+
+    assert chunks[0]["uid"] == 1
+    assert chunks[0]["title"] == "Événement test"
+    assert chunks[0]["description"] == "Description de l'événement test"
+    assert chunks[0]["city"] == "Paris"
+    assert chunks[0]["date_range"] == "4 septembre 2026 de 18h à 20h"
     assert chunks[0]["chunk_index"] == 0
     assert "text" in chunks[0]
