@@ -64,3 +64,30 @@ def load_faiss_index(
         embeddings,
         allow_dangerous_deserialization=True,
     )
+def main() -> None:
+    agenda_uid = 20272888
+
+    events = fetch_all_events(agenda_uid)
+    df = events_to_dataframe(events)
+    df = filter_events(df)
+    df = add_embedding_text(df)
+    chunks = chunk_events(df)
+
+    index = build_faiss_index(chunks)
+
+    if index.index.ntotal != len(chunks):
+        raise RuntimeError(
+            f"FAISS index mismatch: {index.index.ntotal} vectors "
+            f"for {len(chunks)} chunks"
+        )
+
+    save_faiss_index(index)
+
+    print(f"Événements : {len(df)}")
+    print(f"Chunks : {len(chunks)}")
+    print(f"Vecteurs FAISS : {index.index.ntotal}")
+    print("Index FAISS sauvegardé dans data/faiss_index")
+
+
+if __name__ == "__main__":
+    main()
