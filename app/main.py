@@ -1,4 +1,8 @@
-from fastapi import FastAPI, HTTPException
+import os
+import secrets
+
+from fastapi import FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
 
 from app.schemas import AskRequest, AskResponse
 from scripts.build_faiss_index import main as rebuild_faiss_index
@@ -16,6 +20,34 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+
+
+rebuild_api_key_header = APIKeyHeader(
+    name="X-Rebuild-Key",
+    auto_error=False,
+)
+
+
+def verify_rebuild_api_key(
+    api_key: str | None = Security(rebuild_api_key_header),
+) -> None:
+    """Vérifie la clé autorisant la reconstruction de l'index."""
+    expected_api_key = os.getenv("REBUILD_API_KEY")
+
+    if not expected_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="La protection de l'endpoint rebuild n'est pas configurée.",
+        )
+
+    if not api_key or not secrets.compare_digest(
+        api_key,
+        expected_api_key,
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Clé d'accès invalide.",
+        )
 
 
 @app.get(
@@ -37,6 +69,14 @@ def health() -> dict:
     response_model=AskResponse,
     tags=["RAG"],
     summary="Pose une question au système RAG",
+    responses={
+        500: {
+            "description": "Erreur interne du système RAG.",
+        },
+        503: {
+            "description": "Service de génération temporairement indisponible.",
+        },
+    },
 )
 def ask(request: AskRequest) -> AskResponse:
     """Retourne une réponse augmentée à partir des événements FAISS."""
@@ -52,7 +92,10 @@ def ask(request: AskRequest) -> AskResponse:
             f"{error_message}"
         )
 
-        if "429" in error_message or "Rate limit exceeded" in error_message:
+        if (
+            "429" in error_message
+            or "Rate limit exceeded" in error_message
+        ):
             raise HTTPException(
                 status_code=503,
                 detail=(
@@ -76,6 +119,20 @@ def ask(request: AskRequest) -> AskResponse:
     "/rebuild",
     tags=["Index"],
     summary="Reconstruit la base vectorielle FAISS",
+    dependencies=[
+        Security(verify_rebuild_api_key),
+    ],
+    responses={
+        401: {
+            "description": "Clé d'accès absente ou invalide.",
+        },
+        500: {
+            "description": "Erreur lors de la reconstruction de FAISS.",
+        },
+        503: {
+            "description": "Configuration de sécurité indisponible.",
+        },
+    },
 )
 def rebuild() -> dict:
     """Recharge les événements et reconstruit l'index FAISS."""

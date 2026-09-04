@@ -1,5 +1,10 @@
-import requests
+import os
 
+import requests
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 API_URL = "http://127.0.0.1:8000"
 
@@ -45,9 +50,17 @@ def check_ask() -> None:
 
 
 def check_rebuild() -> None:
-    """Vérifie la reconstruction de l'index FAISS."""
+    """Vérifie la reconstruction sécurisée de l'index FAISS."""
+    rebuild_api_key = os.getenv("REBUILD_API_KEY")
+
+    if not rebuild_api_key:
+        raise RuntimeError("REBUILD_API_KEY is missing")
+
     response = requests.post(
         f"{API_URL}/rebuild",
+        headers={
+            "X-Rebuild-Key": rebuild_api_key,
+        },
         timeout=180,
     )
 
