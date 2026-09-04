@@ -4,7 +4,7 @@ import requests
 from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
 from mistralai.client import Mistral
-
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
@@ -222,3 +222,34 @@ def fetch_all_events(
             break
 
     return events
+def chunk_events(
+    df: pd.DataFrame,
+    chunk_size: int = 500,
+    chunk_overlap: int = 50,
+) -> list[dict]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+
+    chunks = []
+
+    for _, row in df.iterrows():
+        texts = splitter.split_text(row["embedding_text"])
+
+        for chunk_index, text in enumerate(texts):
+            chunks.append(
+                {
+                    "uid": row["uid"],
+                    "title": row["title"],
+                    "city": row["city"],
+                    "address": row["address"],
+                    "start_date": row["start_date"],
+                    "end_date": row["end_date"],
+                    "keywords": row["keywords"],
+                    "chunk_index": chunk_index,
+                    "text": text,
+                }
+            )
+
+    return chunks

@@ -4,6 +4,16 @@ from types import SimpleNamespace
 import pandas as pd
 
 import scripts.fetch_openagenda as openagenda
+from scripts.fetch_openagenda import (
+    add_embedding_text,
+    add_mistral_embeddings,
+    chunk_events,
+    events_to_dataframe,
+    fetch_all_events,
+    filter_events,
+    normalize_event,
+    save_processed_events,
+)
 
 
 def test_normalize_event():
@@ -249,3 +259,29 @@ def test_fetch_all_events_pagination(monkeypatch):
     ]
 
     assert call_count == 2
+def test_chunk_events():
+    df = pd.DataFrame(
+        [
+            {
+                "uid": 1,
+                "title": "Événement test",
+                "city": "Paris",
+                "address": "1 rue de Paris",
+                "start_date": "2026-09-04T18:00:00Z",
+                "end_date": "2026-09-04T20:00:00Z",
+                "keywords": ["Jazz"],
+                "embedding_text": "A" * 1200,
+            }
+        ]
+    )
+
+    chunks = chunk_events(
+        df,
+        chunk_size=500,
+        chunk_overlap=50,
+    )
+
+    assert len(chunks) > 1
+    assert all(chunk["uid"] == 1 for chunk in chunks)
+    assert chunks[0]["chunk_index"] == 0
+    assert "text" in chunks[0]
