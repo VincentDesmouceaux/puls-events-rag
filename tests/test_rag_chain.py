@@ -146,3 +146,38 @@ def test_answer_question_uses_retriever_and_llm(monkeypatch):
     assert "Jazz Night" in response
     assert "3 octobre 2026" in response
     assert "Paris" in response
+
+
+def test_answer_question_with_context_returns_ragas_payload(monkeypatch):
+    monkeypatch.setattr(
+        rag_chain,
+        "get_retriever",
+        lambda k=5: FakeRetriever(),
+    )
+
+    fake_llm = RunnableLambda(fake_llm_response)
+
+    monkeypatch.setattr(
+        rag_chain,
+        "get_llm",
+        lambda: fake_llm,
+    )
+
+    question = "Je cherche un concert de jazz à Paris."
+
+    result = rag_chain.answer_question_with_context(question)
+
+    assert result["question"] == question
+    assert "Jazz Night" in result["answer"]
+    assert "3 octobre 2026" in result["answer"]
+
+    assert isinstance(result["retrieved_contexts"], list)
+    assert len(result["retrieved_contexts"]) == 1
+
+    context = result["retrieved_contexts"][0]
+
+    assert "Jazz Night" in context
+    assert "Une soirée jazz." in context
+    assert "141 Rue de Tolbiac" in context
+    assert "Paris" in context
+    assert "2026-10-03T22:30:00+00:00" in context

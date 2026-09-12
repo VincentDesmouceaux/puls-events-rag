@@ -2,6 +2,7 @@ import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
+from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_mistralai import ChatMistralAI
 
@@ -39,42 +40,33 @@ def clear_retriever_cache() -> None:
     get_retriever.cache_clear()
 
 
-def format_documents(documents) -> str:
+def format_document(document: Document) -> str:
+    """Formate un événement récupéré depuis FAISS."""
+    metadata = document.metadata
+
+    return (
+        f"Titre : {metadata.get('title', '')}\n"
+        f"Description : {metadata.get('description', '')}\n"
+        f"Lieu : {metadata.get('address', '')}, "
+        f"{metadata.get('city', '')}\n"
+        f"Date affichée : {metadata.get('date_range', '')}\n"
+        f"Début ISO : {metadata.get('start_date', '')}\n"
+        f"Fin ISO : {metadata.get('end_date', '')}\n"
+        f"Mots-clés : {', '.join(metadata.get('keywords', []))}"
+    )
+
+
+def format_documents(documents: list[Document]) -> str:
     """Formate les événements récupérés pour le prompt."""
-    formatted_documents = []
-
-    for document in documents:
-        metadata = document.metadata
-
-        formatted_documents.append(
-            (
-                f"Titre : {metadata.get('title', '')}\n"
-                f"Description : {metadata.get('description', '')}\n"
-                f"Lieu : {metadata.get('address', '')}, "
-                f"{metadata.get('city', '')}\n"
-                f"Date affichée : {metadata.get('date_range', '')}\n"
-                f"Début ISO : {metadata.get('start_date', '')}\n"
-                f"Fin ISO : {metadata.get('end_date', '')}\n"
-                f"Mots-clés : "
-                f"{', '.join(metadata.get('keywords', []))}"
-            )
-        )
-
-    return "\n\n---\n\n".join(formatted_documents)
+    return "\n\n---\n\n".join(
+        format_document(document)
+        for document in documents
+    )
 
 
-def answer_question(
-    question: str,
-    k: int = 5,
-) -> str:
-    """Répond à une question à partir des événements FAISS."""
-    retriever = get_retriever(k=k)
-
-    documents = retriever.invoke(question)
-
-    context = format_documents(documents)
-
-    prompt = ChatPromptTemplate.from_messages(
+def get_prompt() -> ChatPromptTemplate:
+    """Construit le prompt utilisé par le système RAG."""
+    return ChatPromptTemplate.from_messages(
         [
             (
                 "system",
@@ -107,6 +99,25 @@ def answer_question(
         ]
     )
 
+
+def retrieve_documents(
+    question: str,
+    k: int = 5,
+) -> list[Document]:
+    """Récupère les documents les plus pertinents depuis FAISS."""
+    retriever = get_retriever(k=k)
+
+    return retriever.invoke(question)
+
+
+def generate_answer(
+    question: str,
+    documents: list[Document],
+) -> str:
+    """Génère une réponse Mistral à partir des documents récupérés."""
+    context = format_documents(documents)
+
+    prompt = get_prompt()
     llm = get_llm()
 
     chain = prompt | llm
@@ -119,6 +130,54 @@ def answer_question(
     )
 
     return response.content
+
+
+def answer_question(
+    question: str,
+    k: int = 5,
+) -> str:
+    """Répond à une question à partir des événements FAISS."""
+    documents = retrieve_documents(
+        question=question,
+        k=k,
+    )
+
+    return generate_answer(
+        question=question,
+        documents=documents,
+    )
+
+
+def answer_question_with_context(
+    question: str,
+    k: int = 5,
+) -> dict:
+    """
+    Répond à une question et retourne les contextes récupérés.
+
+    Cette structure est destinée à l'évaluation du système RAG,
+    notamment avec Ragas.
+    """
+    documents = retrieve_documents(
+        question=question,
+        k=k,
+    )
+
+    answer = generate_answer(
+        question=question,
+        documents=documents,
+    )
+
+    retrieved_contexts = [
+        format_document(document)
+        for document in documents
+    ]
+
+    return {
+        "question": question,
+        "answer": answer,
+        "retrieved_contexts": retrieved_contexts,
+    }
 
 
 if __name__ == "__main__":
