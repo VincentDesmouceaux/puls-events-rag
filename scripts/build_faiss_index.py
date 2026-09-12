@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
@@ -15,6 +16,9 @@ from scripts.fetch_openagenda import (
 
 
 load_dotenv()
+
+
+ProgressCallback = Callable[[int, str, int | None, int | None], None]
 
 
 def get_embeddings() -> MistralAIEmbeddings:
@@ -97,22 +101,98 @@ def load_faiss_index(
     )
 
 
-def main() -> None:
+def report_progress(
+    callback: ProgressCallback | None,
+    progress: int,
+    step: str,
+    processed: int | None = None,
+    total: int | None = None,
+) -> None:
+    """Transmet l'avancement du rebuild si un callback est fourni."""
+
+    if callback is not None:
+        callback(
+            progress,
+            step,
+            processed,
+            total,
+        )
+
+
+def main(
+    progress_callback: ProgressCallback | None = None,
+) -> None:
     """Construit et sauvegarde l'index FAISS complet."""
 
     agenda_uid = 20272888
 
+    report_progress(
+        progress_callback,
+        5,
+        "Initialisation de la reconstruction",
+    )
+
+    report_progress(
+        progress_callback,
+        10,
+        "Récupération des événements OpenAgenda",
+    )
+
     events = fetch_all_events(agenda_uid)
+
+    report_progress(
+        progress_callback,
+        25,
+        "Conversion des événements",
+        len(events),
+        len(events),
+    )
 
     df = events_to_dataframe(events)
 
+    report_progress(
+        progress_callback,
+        35,
+        "Filtrage des événements",
+    )
+
     df = filter_events(df)
+
+    report_progress(
+        progress_callback,
+        45,
+        "Préparation des textes pour les embeddings",
+        len(df),
+        len(df),
+    )
 
     df = add_embedding_text(df)
 
+    report_progress(
+        progress_callback,
+        55,
+        "Découpage des événements en chunks",
+    )
+
     chunks = chunk_events(df)
 
+    report_progress(
+        progress_callback,
+        65,
+        "Génération des embeddings et construction FAISS",
+        0,
+        len(chunks),
+    )
+
     index = build_faiss_index(chunks)
+
+    report_progress(
+        progress_callback,
+        90,
+        "Vérification de l'index FAISS",
+        index.index.ntotal,
+        len(chunks),
+    )
 
     if index.index.ntotal != len(chunks):
         raise RuntimeError(
@@ -121,7 +201,23 @@ def main() -> None:
             f"for {len(chunks)} chunks"
         )
 
+    report_progress(
+        progress_callback,
+        95,
+        "Sauvegarde de l'index FAISS",
+        index.index.ntotal,
+        len(chunks),
+    )
+
     save_faiss_index(index)
+
+    report_progress(
+        progress_callback,
+        100,
+        "Reconstruction FAISS terminée",
+        index.index.ntotal,
+        len(chunks),
+    )
 
     print(f"Événements : {len(df)}")
     print(f"Chunks : {len(chunks)}")
