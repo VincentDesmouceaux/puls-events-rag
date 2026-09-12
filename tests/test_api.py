@@ -12,6 +12,7 @@ def reset_rebuild_state() -> None:
         main_module.rebuild_state["status"] = "idle"
         main_module.rebuild_state["started_at"] = None
         main_module.rebuild_state["completed_at"] = None
+        main_module.rebuild_state["duration_seconds"] = 0.0
         main_module.rebuild_state["error"] = None
 
 
@@ -20,11 +21,13 @@ def test_health_endpoint() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "service": "puls-events-rag-api",
-        "version": "0.2.3",
-    }
+
+    payload = response.json()
+
+    assert payload["status"] == "ok"
+    assert payload["service"] == "puls-events-rag-api"
+    assert payload["version"] == "0.2.3"
+    assert payload["timestamp"]
 
 
 def test_ask_success(monkeypatch) -> None:
@@ -127,6 +130,23 @@ def test_ask_internal_error_returns_500(monkeypatch) -> None:
     }
 
 
+def test_metrics_initial_state() -> None:
+    """Vérifie que l'endpoint /metrics expose les statistiques."""
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+
+    payload = response.json()
+
+    assert "requests_total" in payload
+    assert "requests_success" in payload
+    assert "requests_failed" in payload
+    assert "success_rate" in payload
+    assert "average_response_time_ms" in payload
+    assert "last_response_time_ms" in payload
+    assert "last_request_at" in payload
+
+
 def test_rebuild_without_key_returns_401(monkeypatch) -> None:
     """Vérifie que /rebuild refuse une requête sans clé."""
     reset_rebuild_state()
@@ -218,6 +238,7 @@ def test_rebuild_success(monkeypatch) -> None:
         "rebuild_faiss_index",
         fake_rebuild,
     )
+
     monkeypatch.setattr(
         main_module,
         "clear_retriever_cache",
@@ -251,6 +272,7 @@ def test_rebuild_success(monkeypatch) -> None:
     assert data["status"] == "completed"
     assert data["started_at"] is not None
     assert data["completed_at"] is not None
+    assert data["duration_seconds"] is not None
     assert data["error"] is None
 
 
@@ -292,6 +314,7 @@ def test_rebuild_background_error_is_reported(
     assert data["status"] == "failed"
     assert data["started_at"] is not None
     assert data["completed_at"] is not None
+    assert data["duration_seconds"] is not None
     assert data["error"] == "Erreur rebuild simulée"
 
 
@@ -302,12 +325,14 @@ def test_rebuild_status_idle() -> None:
     response = client.get("/rebuild/status")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "idle",
-        "started_at": None,
-        "completed_at": None,
-        "error": None,
-    }
+
+    payload = response.json()
+
+    assert payload["status"] == "idle"
+    assert payload["started_at"] is None
+    assert payload["completed_at"] is None
+    assert payload["duration_seconds"] == 0.0
+    assert payload["error"] is None
 
 
 def test_rebuild_already_running_returns_409(

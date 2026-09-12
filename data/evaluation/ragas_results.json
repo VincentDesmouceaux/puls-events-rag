@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-09-12T14:16:44.218901+00:00",
+  "summary": {
+    "faithfulness": 0.780045351473923,
+    "answer_relevancy": 0.7124787513894988,
+    "context_recall": 0.8571428571428571
+  },
+  "scenario_count": 7,
+  "scenarios": [
+    {
+      "user_input": "Je cherche un événement jazz à Paris.",
+      "response": "Voici une recommandation pour un événement jazz à Paris :\n\n**Soirée jazz manouche & swing**\n- **Date** : Samedi 6 juin 2026, à partir de 19h30\n- **Lieu** : 141 Rue de Tolbiac, Paris\n- **Description** : Laissez-vous emporter par la chaleur du jazz manouche et l’élégance du swing lors d’une soirée captivante avec des violonistes, clarinettistes, guitaristes et pianistes virtueux.\n\n---\n**Jam session jazz** (pour une ambiance plus libre et festive) :\n- **Date** : Samedi 3 octobre 2026, à partir de 22h30\n- **Lieu** : 141 Rue de Tolbiac, Paris\n- **Description** : Jam session jazz avec le **TANA 4tet** – une soirée festive mêlant musique, paillettes et improvisation collective.",
+      "reference": "Je peux recommander TANA JAZZ NIGHT, une jam session jazz organisée au 141 Rue de Tolbiac à Paris en 2026.",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.8518841314756942,
+      "context_recall": 1.0
+    },
+    {
+      "user_input": "Peux-tu me proposer une jam session à Paris ?",
+      "response": "Voici une jam session jazz à Paris pour l'année **2026** :\n\n- **Événement** : *Échecs & Jam !* (Jam session jazz)\n- **Date** : Dimanche **13 septembre**, de **17h à 21h**\n- **Lieu** : 141 Rue de Tolbiac, Paris\n- **Description** : Rendez-vous autour des échecs et d'une jam session jazz. Vous pouvez participer aux tournois via l’appli ChessBar ou jouer librement. Entrée à prix libre.",
+      "reference": "Une jam session disponible est Échecs & Jam, organisée au 141 Rue de Tolbiac à Paris en 2026.",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.8207709214008139,
+      "context_recall": 1.0
+    },
+    {
+      "user_input": "Je cherche une soirée swing à Paris.",
+      "response": "Voici une recommandation pour une soirée swing à Paris :\n\n**Soirée jazz manouche & swing**\n- **Date** : Samedi 6 juin 2026\n- **Heures** : 19h30, 21h30 et 22h30\n- **Lieu** : 141 Rue de Tolbiac, Paris\n- **Description** : Laissez-vous emporter par la chaleur du jazz manouche et l’élégance du swing lors d’une soirée musicale captivante.\n\n*(Les deux autres événements mentionnés incluent aussi le swing, mais la première soirée est explicitement dédiée aux deux styles.)*",
+      "reference": "La Soirée jazz manouche & swing par Alba Obert correspond à cette recherche. Elle se déroule au 141 Rue de Tolbiac à Paris en 2026.",
+      "faithfulness": 0.7142857142857143,
+      "answer_relevancy": 0.7970623974794657,
+      "context_recall": 1.0
+    },
+    {
+      "user_input": "Y a-t-il un événement jazz manouche à Paris ?",
+      "response": "Oui, voici deux événements jazz manouche à Paris :\n\n1. **Soirée jazz manouche & swing**\n   - **Date** : Samedi 6 juin 2026\n   - **Heures** : 19h30 et 21h30\n   - **Lieu** : 141 Rue de Tolbiac, Paris\n   - **Description** : Laissez-vous emporter par la chaleur du jazz manouche et l’élégance du swing.\n\n2. **Django Reinhardt Tribute**\n   - **Date** : Vendredi 24 juillet 2026\n   - **Heures** : 19h30 et 21h30\n   - **Lieu** : 141 Rue de Tolbiac, Paris\n   - **Description** : Soirée dédiée à la musique de Django Reinhardt, avec des standards, de l’improvisation et des surprises.",
+      "reference": "Des événements de jazz manouche sont disponibles au 141 Rue de Tolbiac à Paris, notamment des soirées autour de Django Reinhardt.",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.8090227992300958,
+      "context_recall": 1.0
+    },
+    {
+      "user_input": "Je voudrais découvrir un concert de jazz autour du cinéma.",
+      "response": "Voici une recommandation qui correspond à votre demande :\n\n**CINÉ-JAZZ : les thèmes légendaires du grand écran**\n- **Date** : Samedi 1 août 2026\n- **Horaires** : 19h30 et 21h30\n- **Lieu** : 141 Rue de Tolbiac, Paris\n- **Description** : Un quartet interprète des thèmes légendaires du cinéma à travers le jazz (swing et groove), créant une ambiance immersive où les mélodies s’effacent derrière les images.\n\nCe concert est idéal pour une expérience autour du cinéma avec une touche de jazz.",
+      "reference": "CINÉ-JAZZ : les thèmes légendaires du grand écran correspond à cette demande. L'événement a lieu le 1 août 2026 au 141 Rue de Tolbiac à Paris.",
+      "faithfulness": 0.8571428571428571,
+      "answer_relevancy": 0.8194773115398505,
+      "context_recall": 1.0
+    },
+    {
+      "user_input": "Quels événements jazz ont lieu rue de Tolbiac ?",
+      "response": "Voici les événements jazz qui ont lieu à la **141 Rue de Tolbiac, Paris** cette année :\n\n1. **Zoot Sundays! Sessions Jazz du dimanche**\n   - **Dates et horaires** :\n     - **4 janvier** : 19h30 et 21h30\n     - **8 février** : 19h30\n     - **11 janvier** : 19h30 et 21h30\n     - **22 février** : 19h30\n   - **Description** : Tous les dimanches, des sessions jazz spontanées et variées avec des formations différentes, pour un moment vivant et créatif.\n\nCes événements se déroulent **en 2026**.",
+      "reference": "Plusieurs événements jazz ont lieu au 141 Rue de Tolbiac à Paris, notamment les sessions Zoot Sundays.",
+      "faithfulness": 0.8888888888888888,
+      "answer_relevancy": 0.8891336986005706,
+      "context_recall": 1.0
+    },
+    {
+      "user_input": "Peux-tu me recommander une exposition de peinture à Lyon ?",
+      "response": "Aucun événement d'exposition de peinture à Lyon n'est mentionné dans les données fournies. Je ne peux donc pas te recommander de tel événement.",
+      "reference": "Aucun événement pertinent n'a été trouvé dans le corpus disponible pour une exposition de peinture à Lyon.",
+      "faithfulness": 0.0,
+      "answer_relevancy": 0.0,
+      "context_recall": 0.0
+    }
+  ]
+}

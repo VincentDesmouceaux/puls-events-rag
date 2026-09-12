@@ -143,3 +143,49 @@ def test_build_ragas_dataset_without_network(monkeypatch):
         == fake_rag_result["retrieved_contexts"]
     )
     assert sample.reference == questions[0]["reference_answer"]
+
+def test_save_ragas_results_without_network(tmp_path):
+    import json
+
+    import pandas as pd
+
+    class FakeRagasResult:
+        def to_pandas(self):
+            return pd.DataFrame(
+                [
+                    {
+                        "user_input": "Question 1",
+                        "faithfulness": 1.0,
+                        "answer_relevancy": 0.8,
+                        "context_recall": 1.0,
+                    },
+                    {
+                        "user_input": "Question 2",
+                        "faithfulness": 0.8,
+                        "answer_relevancy": 0.6,
+                        "context_recall": 0.9,
+                    },
+                ]
+            )
+
+    output_path = tmp_path / "ragas_results.json"
+
+    evaluate_rag.save_ragas_results(
+        FakeRagasResult(),
+        output_path=str(output_path),
+    )
+
+    assert output_path.exists()
+
+    payload = json.loads(
+        output_path.read_text(encoding="utf-8")
+    )
+
+    assert payload["scenario_count"] == 2
+
+    assert payload["summary"]["faithfulness"] == 0.9
+    assert payload["summary"]["answer_relevancy"] == 0.7
+    assert payload["summary"]["context_recall"] == 0.95
+
+    assert len(payload["scenarios"]) == 2
+    assert payload["scenarios"][0]["user_input"] == "Question 1"
