@@ -1,4 +1,5 @@
 import os
+import time
 
 import httpx
 import streamlit as st
@@ -13,7 +14,9 @@ API_BASE_URL = os.getenv(
     "https://p01--p9bot--wd4gpkqcrlm8.code.run",
 )
 
-REBUILD_API_KEY = os.getenv("REBUILD_API_KEY")
+REBUILD_API_KEY = os.getenv(
+    "REBUILD_API_KEY"
+)
 
 
 st.set_page_config(
@@ -22,50 +25,75 @@ st.set_page_config(
     layout="wide",
 )
 
+
 st.title("Puls-Events RAG")
+
 st.caption(
     "Dashboard de démonstration et de monitoring "
     "du système de recommandation culturelle."
 )
 
 
-def get_endpoint(path: str, timeout: float = 5.0) -> dict:
+def get_endpoint(
+    path: str,
+    timeout: float = 5.0,
+) -> dict:
     """Appelle un endpoint GET de l'API FastAPI."""
+
     response = httpx.get(
         f"{API_BASE_URL}{path}",
         timeout=timeout,
     )
+
     response.raise_for_status()
+
     return response.json()
 
 
 def get_api_health() -> dict:
     """Récupère l'état de santé de l'API."""
-    return get_endpoint("/health")
+
+    return get_endpoint(
+        "/health"
+    )
 
 
 def get_metrics() -> dict:
     """Récupère les métriques runtime du système RAG."""
-    return get_endpoint("/metrics")
+
+    return get_endpoint(
+        "/metrics"
+    )
 
 
 def get_index_info() -> dict:
     """Récupère les informations de l'index FAISS."""
-    return get_endpoint("/index/info", timeout=15.0)
+
+    return get_endpoint(
+        "/index/info",
+        timeout=15.0,
+    )
 
 
 def get_rebuild_status() -> dict:
     """Récupère l'état de la reconstruction FAISS."""
-    return get_endpoint("/rebuild/status")
+
+    return get_endpoint(
+        "/rebuild/status"
+    )
 
 
 def get_evaluation_status() -> dict:
     """Récupère les résultats de l'évaluation Ragas."""
-    return get_endpoint("/evaluation/status")
+
+    return get_endpoint(
+        "/evaluation/status"
+    )
 
 
 def trigger_rebuild() -> dict:
     """Déclenche une reconstruction FAISS protégée."""
+
     if not REBUILD_API_KEY:
         raise RuntimeError(
             "REBUILD_API_KEY is missing"
@@ -78,13 +106,17 @@ def trigger_rebuild() -> dict:
         },
         timeout=10.0,
     )
+
     response.raise_for_status()
 
     return response.json()
 
 
-def ask_rag(question: str) -> dict:
+def ask_rag(
+    question: str,
+) -> dict:
     """Envoie une question au système RAG."""
+
     response = httpx.post(
         f"{API_BASE_URL}/ask",
         json={
@@ -92,17 +124,47 @@ def ask_rag(question: str) -> dict:
         },
         timeout=30.0,
     )
+
     response.raise_for_status()
 
     return response.json()
 
 
-def format_timestamp(value: str | None) -> str:
-    """Rend un timestamp plus lisible dans le dashboard."""
+def format_timestamp(
+    value: str | None,
+) -> str:
+    """Rend un timestamp plus lisible."""
+
     if not value:
         return "N/A"
 
-    return value.replace("T", " ").replace("+00:00", " UTC")
+    return (
+        value
+        .replace("T", " ")
+        .replace("+00:00", " UTC")
+    )
+
+
+def clamp_progress(
+    value,
+) -> int:
+    """Garantit une progression comprise entre 0 et 100."""
+
+    try:
+        progress = int(value)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        progress = 0
+
+    return max(
+        0,
+        min(
+            progress,
+            100,
+        ),
+    )
 
 
 overview_tab, assistant_tab, ragas_tab = st.tabs(
@@ -115,26 +177,43 @@ overview_tab, assistant_tab, ragas_tab = st.tabs(
 
 
 with overview_tab:
-    st.subheader("État de l'API")
+    st.subheader(
+        "État de l'API"
+    )
 
     try:
         health = get_api_health()
 
-        st.success("API opérationnelle")
+        st.success(
+            "API opérationnelle"
+        )
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(
+            3
+        )
 
         col1.metric(
             "Status",
-            health.get("status", "unknown"),
+            health.get(
+                "status",
+                "unknown",
+            ),
         )
+
         col2.metric(
             "Service",
-            health.get("service", "unknown"),
+            health.get(
+                "service",
+                "unknown",
+            ),
         )
+
         col3.metric(
             "Version",
-            health.get("version", "unknown"),
+            health.get(
+                "version",
+                "unknown",
+            ),
         )
 
         st.caption(
@@ -143,44 +222,76 @@ with overview_tab:
         )
 
     except httpx.HTTPError as exc:
-        st.error("Impossible de contacter l'API FastAPI.")
-        st.code(str(exc))
+        st.error(
+            "Impossible de contacter l'API FastAPI."
+        )
+
+        st.code(
+            str(exc)
+        )
 
     st.divider()
 
-    st.subheader("Monitoring RAG")
+    st.subheader(
+        "Monitoring RAG"
+    )
 
     try:
         metrics = get_metrics()
 
-        total = metrics.get("requests_total", 0)
-        success = metrics.get("requests_success", 0)
-        failed = metrics.get("requests_failed", 0)
+        total = metrics.get(
+            "requests_total",
+            0,
+        )
 
-        col1, col2, col3, col4 = st.columns(4)
+        success = metrics.get(
+            "requests_success",
+            0,
+        )
+
+        failed = metrics.get(
+            "requests_failed",
+            0,
+        )
+
+        col1, col2, col3, col4 = st.columns(
+            4
+        )
 
         col1.metric(
             "Requêtes",
             total,
         )
+
         col2.metric(
             "Succès",
             success,
         )
+
         col3.metric(
             "Échecs",
             failed,
         )
+
         col4.metric(
             "Taux de succès",
-            f"{metrics.get('success_rate', 0.0):.1f} %",
+            (
+                f"{metrics.get('success_rate', 0.0):.1f} %"
+            ),
         )
 
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(
+            2
+        )
 
         col1.metric(
             "Temps moyen",
-            f"{metrics.get('average_response_time_ms', 0.0):.0f} ms",
+            (
+                f"{metrics.get(
+                    'average_response_time_ms',
+                    0.0,
+                ):.0f} ms"
+            ),
         )
 
         last_response_time = metrics.get(
@@ -198,7 +309,9 @@ with overview_tab:
 
         st.caption(
             "Dernière requête : "
-            f"{format_timestamp(metrics.get('last_request_at'))}"
+            f"{format_timestamp(
+                metrics.get('last_request_at')
+            )}"
         )
 
         if total > 0:
@@ -210,6 +323,7 @@ with overview_tab:
                     }
                 }
             )
+
         else:
             st.info(
                 "Aucune requête RAG enregistrée "
@@ -218,74 +332,142 @@ with overview_tab:
 
         st.caption(
             "Ces métriques sont conservées en mémoire "
-            "et sont réinitialisées au redémarrage de l'API."
+            "et sont réinitialisées au redémarrage "
+            "de l'API."
         )
 
     except httpx.HTTPError as exc:
         st.error(
             "Impossible de récupérer les métriques RAG."
         )
-        st.code(str(exc))
+
+        st.code(
+            str(exc)
+        )
 
     st.divider()
 
-    st.subheader("Index FAISS")
+    st.subheader(
+        "Index FAISS"
+    )
 
     try:
         index_info = get_index_info()
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(
+            4
+        )
 
         col1.metric(
             "État",
-            index_info.get("status", "unknown"),
+            index_info.get(
+                "status",
+                "unknown",
+            ),
         )
+
         col2.metric(
             "Vecteurs",
-            index_info.get("vectors", 0),
+            index_info.get(
+                "vectors",
+                0,
+            ),
         )
+
         col3.metric(
             "Dimension",
-            index_info.get("dimension", 0),
+            index_info.get(
+                "dimension",
+                0,
+            ),
         )
+
         col4.metric(
             "Type",
-            index_info.get("index_type", "unknown"),
+            index_info.get(
+                "index_type",
+                "unknown",
+            ),
         )
 
         st.caption(
-            f"Index : {index_info.get('index_path', 'N/A')}"
+            "Index : "
+            f"{index_info.get('index_path', 'N/A')}"
         )
 
     except httpx.HTTPError as exc:
         st.error(
-            "Impossible de récupérer les informations FAISS."
+            "Impossible de récupérer "
+            "les informations FAISS."
         )
-        st.code(str(exc))
+
+        st.code(
+            str(exc)
+        )
 
     st.divider()
 
-    st.subheader("Reconstruction FAISS")
+    st.subheader(
+        "Reconstruction FAISS"
+    )
+
+    rebuild_status = {}
+    should_refresh = False
 
     try:
         rebuild_status = get_rebuild_status()
 
-        col1, col2, col3, col4 = st.columns(4)
+        current_status = rebuild_status.get(
+            "status",
+            "unknown",
+        )
+
+        progress = clamp_progress(
+            rebuild_status.get(
+                "progress",
+                0,
+            )
+        )
+
+        step = rebuild_status.get(
+            "step",
+            "En attente",
+        )
+
+        processed = rebuild_status.get(
+            "processed",
+            0,
+        )
+
+        total_items = rebuild_status.get(
+            "total",
+            0,
+        )
+
+        col1, col2, col3, col4 = st.columns(
+            4
+        )
 
         col1.metric(
             "État",
-            rebuild_status.get("status", "unknown"),
+            current_status,
         )
+
         col2.metric(
             "Début",
             format_timestamp(
-                rebuild_status.get("started_at")
+                rebuild_status.get(
+                    "started_at"
+                )
             ),
         )
+
         col3.metric(
             "Fin",
             format_timestamp(
-                rebuild_status.get("completed_at")
+                rebuild_status.get(
+                    "completed_at"
+                )
             ),
         )
 
@@ -302,15 +484,62 @@ with overview_tab:
             ),
         )
 
-        if rebuild_status.get("error"):
-            st.error(rebuild_status["error"])
-        elif rebuild_status.get("status") == "completed":
-            st.success(
-                "Dernière reconstruction FAISS terminée."
+        st.markdown(
+            "#### Progression"
+        )
+
+        st.progress(
+            progress,
+            text=(
+                f"{progress} % — {step}"
+            ),
+        )
+
+        if total_items:
+            st.caption(
+                "Éléments traités : "
+                f"{processed} / {total_items}"
             )
+
         else:
+            st.caption(
+                f"Étape courante : {step}"
+            )
+
+        if current_status == "running":
+            st.info(
+                "Reconstruction FAISS en cours..."
+            )
+
+            should_refresh = True
+
+        elif current_status == "completed":
+            st.success(
+                "Dernière reconstruction FAISS "
+                "terminée avec succès."
+            )
+
+        elif current_status == "failed":
+            st.error(
+                "La dernière reconstruction FAISS "
+                "a échoué."
+            )
+
+            if rebuild_status.get(
+                "error"
+            ):
+                st.code(
+                    rebuild_status["error"]
+                )
+
+        elif current_status == "idle":
             st.info(
                 "Aucune reconstruction FAISS en cours."
+            )
+
+        else:
+            st.warning(
+                "État de reconstruction inconnu."
             )
 
     except httpx.HTTPError as exc:
@@ -318,7 +547,15 @@ with overview_tab:
             "Impossible de récupérer l'état "
             "de la reconstruction FAISS."
         )
-        st.code(str(exc))
+
+        st.code(
+            str(exc)
+        )
+
+    is_running = (
+        rebuild_status.get("status")
+        == "running"
+    )
 
     if not REBUILD_API_KEY:
         st.warning(
@@ -328,7 +565,11 @@ with overview_tab:
 
     if st.button(
         "Reconstruire l'index FAISS",
-        disabled=not bool(REBUILD_API_KEY),
+        disabled=(
+            not bool(REBUILD_API_KEY)
+            or is_running
+        ),
+        type="primary",
     ):
         try:
             result = trigger_rebuild()
@@ -350,11 +591,27 @@ with overview_tab:
                 "Impossible de lancer "
                 "la reconstruction FAISS."
             )
-            st.code(str(exc))
+
+            st.code(
+                str(exc)
+            )
+
+    if should_refresh:
+        st.caption(
+            "Actualisation automatique de la progression..."
+        )
+
+        time.sleep(
+            1
+        )
+
+        st.rerun()
 
 
 with assistant_tab:
-    st.subheader("Assistant culturel")
+    st.subheader(
+        "Assistant culturel"
+    )
 
     st.write(
         "Interrogez le système RAG sur les événements "
@@ -363,7 +620,9 @@ with assistant_tab:
 
     question = st.text_input(
         "Votre question",
-        placeholder="Je cherche une soirée jazz à Paris.",
+        placeholder=(
+            "Je cherche une soirée jazz à Paris."
+        ),
     )
 
     if st.button(
@@ -384,7 +643,10 @@ with assistant_tab:
                         question.strip()
                     )
 
-                    st.subheader("Réponse")
+                    st.subheader(
+                        "Réponse"
+                    )
+
                     st.markdown(
                         result.get(
                             "answer",
@@ -397,21 +659,29 @@ with assistant_tab:
                         "Erreur lors de l'appel "
                         "au système RAG."
                     )
-                    st.code(str(exc))
+
+                    st.code(
+                        str(exc)
+                    )
 
 
 with ragas_tab:
-    st.subheader("Évaluation Ragas")
+    st.subheader(
+        "Évaluation Ragas"
+    )
 
     st.write(
-        "Évaluation automatique de la qualité du système "
-        "RAG sur un jeu de scénarios de référence."
+        "Évaluation automatique de la qualité "
+        "du système RAG sur un jeu de scénarios "
+        "de référence."
     )
 
     try:
         evaluation = get_evaluation_status()
 
-        if not evaluation.get("results_available"):
+        if not evaluation.get(
+            "results_available"
+        ):
             st.warning(
                 "Aucune évaluation Ragas disponible."
             )
@@ -427,31 +697,64 @@ with ragas_tab:
                 0,
             )
 
-            col1, col2, col3, col4 = st.columns(4)
+            generated_at = evaluation.get(
+                "generated_at"
+            )
+
+            col1, col2, col3, col4 = st.columns(
+                4
+            )
 
             col1.metric(
                 "Scénarios",
                 scenario_count,
             )
+
             col2.metric(
                 "Faithfulness",
-                f"{summary.get('faithfulness', 0.0):.3f}",
+                (
+                    f"{summary.get(
+                        'faithfulness',
+                        0.0,
+                    ):.3f}"
+                ),
             )
+
             col3.metric(
                 "Answer relevancy",
-                f"{summary.get('answer_relevancy', 0.0):.3f}",
+                (
+                    f"{summary.get(
+                        'answer_relevancy',
+                        0.0,
+                    ):.3f}"
+                ),
             )
+
             col4.metric(
                 "Context recall",
-                f"{summary.get('context_recall', 0.0):.3f}",
+                (
+                    f"{summary.get(
+                        'context_recall',
+                        0.0,
+                    ):.3f}"
+                ),
             )
+
+            if generated_at:
+                st.caption(
+                    "Évaluation générée le : "
+                    f"{format_timestamp(generated_at)}"
+                )
 
             st.caption(
-                "Les scores Ragas sont compris entre 0 et 1. "
-                "Une valeur élevée indique une meilleure qualité."
+                "Les scores Ragas sont compris entre "
+                "0 et 1. Une valeur élevée indique "
+                "une meilleure qualité selon la métrique."
             )
 
-            st.subheader("Scores globaux")
+            st.subheader(
+                "Scores globaux"
+            )
 
             global_scores = {
                 "Faithfulness": summary.get(
@@ -468,7 +771,9 @@ with ragas_tab:
                 ),
             }
 
-            st.bar_chart(global_scores)
+            st.bar_chart(
+                global_scores
+            )
 
             scenarios = evaluation.get(
                 "scenarios",
@@ -546,7 +851,9 @@ with ragas_tab:
                         ),
                     }
 
-                st.bar_chart(scenario_chart)
+                st.bar_chart(
+                    scenario_chart
+                )
 
             st.caption(
                 "Résultats chargés depuis : "
@@ -558,7 +865,10 @@ with ragas_tab:
             "Impossible de récupérer "
             "les résultats Ragas."
         )
-        st.code(str(exc))
+
+        st.code(
+            str(exc)
+        )
 
 
 st.divider()

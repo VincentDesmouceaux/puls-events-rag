@@ -26,8 +26,10 @@ from scripts.rag_chain import (
 )
 
 
-API_VERSION = "0.2.3"
+API_VERSION = "0.2.4"
+
 FAISS_INDEX_DIR = Path("data/faiss_index")
+
 RAGAS_RESULTS_PATH = Path(
     "data/evaluation/ragas_results.json"
 )
@@ -59,6 +61,10 @@ rebuild_state = {
     "completed_at": None,
     "duration_seconds": None,
     "error": None,
+    "progress": 0,
+    "step": "En attente",
+    "processed": 0,
+    "total": 0,
 }
 
 
@@ -74,6 +80,7 @@ rag_metrics = {
 
 def utc_now() -> str:
     """Retourne la date UTC actuelle au format ISO."""
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -83,6 +90,7 @@ def verify_rebuild_api_key(
     ),
 ) -> None:
     """Vérifie la clé autorisant la reconstruction."""
+
     expected_api_key = os.getenv("REBUILD_API_KEY")
 
     if not expected_api_key:
@@ -110,6 +118,7 @@ def record_rag_request(
     duration_ms: float,
 ) -> None:
     """Enregistre les métriques d'une requête RAG."""
+
     with metrics_lock:
         rag_metrics["requests_total"] += 1
 
@@ -121,24 +130,70 @@ def record_rag_request(
         rag_metrics["total_response_time_ms"] += (
             duration_ms
         )
+
         rag_metrics["last_response_time_ms"] = (
             round(duration_ms, 2)
         )
+
         rag_metrics["last_request_at"] = utc_now()
+
+
+def update_rebuild_progress(
+    progress: int,
+    step: str,
+    processed: int | None = None,
+    total: int | None = None,
+) -> None:
+    """Met à jour l'avancement courant du rebuild FAISS."""
+
+    progress = max(
+        0,
+        min(
+            int(progress),
+            100,
+        ),
+    )
+
+    with rebuild_lock:
+        rebuild_state["progress"] = progress
+        rebuild_state["step"] = step
+
+        if processed is not None:
+            rebuild_state["processed"] = int(
+                processed
+            )
+
+        if total is not None:
+            rebuild_state["total"] = int(
+                total
+            )
 
 
 def run_faiss_rebuild() -> None:
     """Reconstruit FAISS et met à jour son état."""
+
     started = time.perf_counter()
 
     try:
-        rebuild_faiss_index()
+        rebuild_faiss_index(
+            progress_callback=update_rebuild_progress
+        )
+
+        update_rebuild_progress(
+            100,
+            "Rechargement du retriever RAG",
+        )
+
         clear_retriever_cache()
 
         duration = time.perf_counter() - started
 
         with rebuild_lock:
             rebuild_state["status"] = "completed"
+            rebuild_state["progress"] = 100
+            rebuild_state["step"] = (
+                "Reconstruction FAISS terminée"
+            )
             rebuild_state["completed_at"] = utc_now()
             rebuild_state["duration_seconds"] = round(
                 duration,
@@ -146,13 +201,18 @@ def run_faiss_rebuild() -> None:
             )
             rebuild_state["error"] = None
 
-        print("Rebuild FAISS terminé avec succès.")
+        print(
+            "Rebuild FAISS terminé avec succès."
+        )
 
     except Exception as exc:
         duration = time.perf_counter() - started
 
         with rebuild_lock:
             rebuild_state["status"] = "failed"
+            rebuild_state["step"] = (
+                "Échec de la reconstruction FAISS"
+            )
             rebuild_state["completed_at"] = utc_now()
             rebuild_state["duration_seconds"] = round(
                 duration,
@@ -174,6 +234,7 @@ def run_faiss_rebuild() -> None:
 )
 def health() -> dict:
     """Retourne l'état de fonctionnement de l'API."""
+
     return {
         "status": "ok",
         "service": "puls-events-rag-api",
@@ -201,8 +262,11 @@ def health() -> dict:
         },
     },
 )
-def ask(request: AskRequest) -> AskResponse:
+def ask(
+    request: AskRequest,
+) -> AskResponse:
     """Retourne une réponse augmentée depuis FAISS."""
+
     started = time.perf_counter()
 
     try:
@@ -270,6 +334,7 @@ def ask(request: AskRequest) -> AskResponse:
 )
 def metrics() -> dict:
     """Retourne les statistiques des requêtes RAG."""
+
     with metrics_lock:
         current = dict(rag_metrics)
 
@@ -281,11 +346,13 @@ def metrics() -> dict:
             (success / total) * 100,
             2,
         )
+
         average_response_time_ms = round(
             current["total_response_time_ms"]
             / total,
             2,
         )
+
     else:
         success_rate = 0.0
         average_response_time_ms = 0.0
@@ -316,8 +383,16 @@ def metrics() -> dict:
 )
 def index_info() -> dict:
     """Inspecte l'index FAISS actuellement disponible."""
-    index_file = FAISS_INDEX_DIR / "index.faiss"
-    metadata_file = FAISS_INDEX_DIR / "index.pkl"
+
+    index_file = (
+        FAISS_INDEX_DIR
+        / "index.faiss"
+    )
+
+    metadata_file = (
+        FAISS_INDEX_DIR
+        / "index.pkl"
+    )
 
     if not index_file.exists():
         raise HTTPException(
@@ -376,11 +451,15 @@ def index_info() -> dict:
 )
 def evaluation_status() -> dict:
     """Lit le dernier artefact d'évaluation Ragas."""
+
     if not RAGAS_RESULTS_PATH.exists():
         return {
             "status": "not_evaluated",
             "results_available": False,
-            "path": str(RAGAS_RESULTS_PATH),
+            "path": str(
+                RAGAS_RESULTS_PATH
+            ),
+            "generated_at": None,
             "summary": {},
             "scenario_count": 0,
             "scenarios": [],
@@ -407,7 +486,12 @@ def evaluation_status() -> dict:
     return {
         "status": "evaluated",
         "results_available": True,
-        "path": str(RAGAS_RESULTS_PATH),
+        "path": str(
+            RAGAS_RESULTS_PATH
+        ),
+        "generated_at": payload.get(
+            "generated_at"
+        ),
         "summary": payload.get(
             "summary",
             {},
@@ -432,7 +516,9 @@ def evaluation_status() -> dict:
     ),
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[
-        Security(verify_rebuild_api_key),
+        Security(
+            verify_rebuild_api_key
+        ),
     ],
     responses={
         202: {
@@ -461,6 +547,7 @@ def rebuild(
     background_tasks: BackgroundTasks,
 ) -> dict:
     """Programme une reconstruction FAISS."""
+
     with rebuild_lock:
         if rebuild_state["status"] == "running":
             raise HTTPException(
@@ -476,6 +563,13 @@ def rebuild(
         rebuild_state["completed_at"] = None
         rebuild_state["duration_seconds"] = None
         rebuild_state["error"] = None
+
+        rebuild_state["progress"] = 0
+        rebuild_state["step"] = (
+            "Reconstruction programmée"
+        )
+        rebuild_state["processed"] = 0
+        rebuild_state["total"] = 0
 
     background_tasks.add_task(
         run_faiss_rebuild
@@ -493,9 +587,14 @@ def rebuild(
 @app.get(
     "/rebuild/status",
     tags=["Index"],
-    summary="Consulte l'état de la reconstruction FAISS",
+    summary=(
+        "Consulte l'état de la reconstruction FAISS"
+    ),
 )
 def rebuild_status() -> dict:
     """Retourne l'état courant du rebuild FAISS."""
+
     with rebuild_lock:
-        return dict(rebuild_state)
+        return dict(
+            rebuild_state
+        )
