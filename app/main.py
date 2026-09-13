@@ -31,7 +31,7 @@ from scripts.rag_chain import (
 # Configuration
 # -------------------------------------------------------------------
 
-API_VERSION = "0.2.5"
+API_VERSION = "0.2.6"
 
 FAISS_INDEX_DIR = Path("data/faiss_index")
 
