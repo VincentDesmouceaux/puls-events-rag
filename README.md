@@ -596,7 +596,7 @@ Exemple :
 {
   "status": "ok",
   "service": "puls-events-rag-api",
-  "version": "0.2.4"
+  "version": "0.2.6"
 }
 ```
 
@@ -780,7 +780,7 @@ failed
 
 ### Progression du rebuild
 
-La version `0.2.4` expose une progression structurée :
+La version `0.2.6` expose une progression structurée :
 
 ```text
 5 %   Initialisation
@@ -967,7 +967,7 @@ Le dashboard peut également cibler l’API Northflank en utilisant son URL de p
 uv run pytest -q
 ```
 
-État validé pour la version `0.2.4` :
+État validé pour la version `0.2.6` :
 
 ```text
 38 passed
@@ -1325,10 +1325,10 @@ Le projet reste volontairement un Proof of Concept.
 ## Version actuelle
 
 ```text
-0.2.4
+0.2.6
 ```
 
-### Principales évolutions de la version `0.2.4`
+### Principales évolutions de la version `0.2.6`
 
 - intégration de **Ragas** ;
 - ajout des métriques `Faithfulness`, `ResponseRelevancy` et `LLMContextRecall` ;
