@@ -1,42 +1,108 @@
 # Puls-Events RAG
 
-Proof of Concept d'un assistant intelligent de recommandation d'événements culturels basé sur une architecture RAG (*Retrieval-Augmented Generation*).
-
-Le projet combine les données de l'API OpenAgenda, des embeddings Mistral, une base vectorielle FAISS, LangChain, un modèle de langage Mistral et une API REST FastAPI.
-
----
-
-## Objectif du projet
-
-Puls-Events souhaite évaluer la faisabilité technique d'un assistant capable de répondre en langage naturel à des questions concernant des événements culturels.
-
-Le système doit notamment permettre :
-
-- de récupérer des événements depuis l'API OpenAgenda ;
-- de nettoyer et normaliser les données ;
-- de filtrer les événements selon leur localisation et leur date ;
-- de transformer les données textuelles en embeddings ;
-- de construire un index vectoriel FAISS ;
-- d'effectuer une recherche sémantique ;
-- de transmettre le contexte pertinent à un LLM ;
-- de générer une réponse contextualisée ;
-- d'exposer le système via une API REST ;
-- d'évaluer automatiquement le comportement du système ;
-- de reconstruire l'index FAISS sans bloquer l'API ;
-- de déployer et valider le POC dans un environnement conteneurisé.
-
-La zone géographique retenue pour le POC est **Paris**.
-
-Les événements considérés couvrent :
-
-- les 365 derniers jours ;
-- l'ensemble des événements futurs disponibles.
+> **Proof of Concept — Assistant intelligent de recommandation d’événements culturels**  
+> Architecture RAG (*Retrieval-Augmented Generation*) basée sur **OpenAgenda**, **LangChain**, **Mistral AI**, **FAISS**, **FastAPI**, **Ragas**, **Streamlit**, **Docker** et **GitHub Actions**.
 
 ---
 
-## Architecture RAG
+## Sommaire
 
-Le pipeline général du projet est le suivant :
+1. [Présentation](#présentation)
+2. [Objectifs du POC](#objectifs-du-poc)
+3. [Architecture générale](#architecture-générale)
+4. [Stack technique](#stack-technique)
+5. [Structure du projet](#structure-du-projet)
+6. [Installation et configuration](#installation-et-configuration)
+7. [Collecte et préparation des données](#collecte-et-préparation-des-données)
+8. [Embeddings et index FAISS](#embeddings-et-index-faiss)
+9. [Chaîne RAG](#chaîne-rag)
+10. [API REST FastAPI](#api-rest-fastapi)
+11. [Reconstruction de l’index](#reconstruction-de-lindex)
+12. [Évaluation avec Ragas](#évaluation-avec-ragas)
+13. [Dashboard Streamlit](#dashboard-streamlit)
+14. [Tests automatisés](#tests-automatisés)
+15. [Docker](#docker)
+16. [CI/CD et déploiement](#cicd-et-déploiement)
+17. [Sécurité](#sécurité)
+18. [Workflow Git](#workflow-git)
+19. [Résultats du POC](#résultats-du-poc)
+20. [Limites et perspectives](#limites-et-perspectives)
+21. [Version actuelle](#version-actuelle)
+
+---
+
+## Présentation
+
+**Puls-Events RAG** est un Proof of Concept destiné à évaluer la faisabilité d’un assistant capable de recommander des événements culturels à partir d’une question formulée en langage naturel.
+
+Le système ne demande pas au modèle de langage de répondre uniquement à partir de ses connaissances générales. Il récupère d’abord des événements pertinents dans une base vectorielle, puis transmet ce contexte au LLM afin de générer une réponse fondée sur les données disponibles.
+
+Le POC combine :
+
+- les données événementielles de l’API **OpenAgenda** ;
+- un pipeline de préparation et de normalisation des données ;
+- les embeddings **Mistral `mistral-embed`** ;
+- une base vectorielle **FAISS** ;
+- un retriever **LangChain** ;
+- un modèle génératif **Mistral** ;
+- une API REST **FastAPI** ;
+- une évaluation automatique avec **Ragas** ;
+- un dashboard de suivi **Streamlit** ;
+- une conteneurisation **Docker** ;
+- une chaîne d’intégration et de validation avec **GitHub Actions** ;
+- un déploiement du POC sur **Northflank**.
+
+La zone géographique choisie pour cette démonstration est **Paris**.
+
+---
+
+## Objectifs du POC
+
+### Objectif métier
+
+L’objectif est de permettre à un utilisateur de poser une question telle que :
+
+```text
+Je cherche un concert de jazz à Paris.
+```
+
+et d’obtenir une réponse construite à partir des événements effectivement présents dans le corpus.
+
+### Objectifs techniques
+
+Le système doit permettre de :
+
+- récupérer des événements depuis OpenAgenda ;
+- nettoyer et normaliser les données ;
+- filtrer les événements selon leur localisation et leur date ;
+- construire une représentation textuelle exploitable ;
+- découper les documents en chunks ;
+- générer des embeddings ;
+- créer et persister un index vectoriel FAISS ;
+- effectuer une recherche sémantique ;
+- construire un contexte RAG ;
+- générer une réponse avec Mistral ;
+- exposer le système via une API REST ;
+- reconstruire la base vectorielle à la demande ;
+- sécuriser l’endpoint sensible de reconstruction ;
+- évaluer automatiquement le système avec Ragas ;
+- superviser les métriques principales via Streamlit ;
+- tester et déployer le POC de façon reproductible.
+
+### Périmètre temporel
+
+Les événements conservés couvrent :
+
+- les **365 derniers jours** ;
+- tous les événements futurs disponibles dans la source.
+
+Ce choix permet de conserver un historique récent tout en privilégiant les événements encore utiles à la recommandation.
+
+---
+
+## Architecture générale
+
+### Pipeline RAG
 
 ```text
 OpenAgenda API
@@ -48,10 +114,13 @@ Collecte des événements
 Nettoyage / normalisation
       │
       ▼
-Construction du texte documentaire
+Filtrage temporel et géographique
       │
       ▼
-Découpage en chunks
+Construction de embedding_text
+      │
+      ▼
+Chunking
       │
       ▼
 Mistral Embeddings
@@ -60,54 +129,74 @@ Mistral Embeddings
 FAISS
       │
       ▼
-Recherche sémantique
-      │
-      ▼
 Retriever LangChain
       │
       ▼
-Prompt enrichi avec le contexte
+Documents pertinents
+      │
+      ▼
+Construction du contexte
+      │
+      ▼
+Prompt RAG
       │
       ▼
 LLM Mistral
       │
       ▼
-Réponse utilisateur
+Réponse contextualisée
       │
       ▼
-FastAPI
+FastAPI / Streamlit
 ```
 
-Le principe du RAG consiste à rechercher d'abord les informations pertinentes dans une base documentaire, puis à fournir ces informations au modèle de langage afin de générer une réponse fondée sur le contexte récupéré.
+### Principe
 
-Cette approche permet de limiter les hallucinations et de spécialiser les réponses du modèle sur les événements disponibles dans le corpus Puls-Events.
+Le RAG sépare deux opérations :
+
+1. **Retrieval** : rechercher les documents les plus pertinents dans FAISS.
+2. **Generation** : transmettre ces documents au LLM pour générer une réponse.
+
+Cette approche permet de réduire les hallucinations et de spécialiser la génération sur les événements réellement disponibles dans le corpus.
 
 ---
 
 ## Stack technique
 
-Le projet utilise principalement :
+### Backend et API
 
-- Python 3.12 ;
-- uv ;
-- FastAPI ;
-- Uvicorn ;
-- LangChain ;
-- Mistral AI ;
-- FAISS CPU ;
-- pandas ;
-- NumPy ;
-- Pytest ;
-- pytest-cov ;
-- HTTPX ;
-- python-dotenv ;
-- Docker ;
-- GitHub Actions ;
-- Northflank.
+- Python 3.12
+- FastAPI
+- Uvicorn
+- Pydantic
+- HTTPX
+- python-dotenv
 
-Zvec est également présent à titre expérimental.
+### RAG et Machine Learning
 
-FAISS reste la base vectorielle principale retenue pour le POC.
+- LangChain
+- Mistral AI
+- `mistral-embed`
+- `ministral-3b-latest`
+- FAISS CPU
+- pandas
+- NumPy
+- Ragas
+
+### Interface et monitoring
+
+- Streamlit
+
+### Qualité et déploiement
+
+- Pytest
+- pytest-cov
+- Docker
+- GitHub Actions
+- Northflank
+- GitFlow
+
+FAISS constitue la base vectorielle principale du POC.
 
 ---
 
@@ -128,11 +217,15 @@ puls-events-rag/
 │   ├── evaluate_rag.py
 │   └── start.sh
 │
+├── dashboard/
+│   └── app.py
+│
 ├── data/
 │   ├── raw/
 │   ├── processed/
 │   ├── evaluation/
-│   │   └── rag_questions.json
+│   │   ├── rag_questions.json
+│   │   └── ragas_results.json
 │   └── faiss_index/
 │       ├── index.faiss
 │       └── index.pkl
@@ -140,7 +233,8 @@ puls-events-rag/
 ├── tests/
 │   ├── test_environment.py
 │   ├── test_api.py
-│   └── ...
+│   ├── test_rag_chain.py
+│   └── test_evaluate_rag.py
 │
 ├── docs/
 │
@@ -158,28 +252,35 @@ puls-events-rag/
 └── README.md
 ```
 
-Les fichiers générés dans `data/processed/` et `data/faiss_index/` peuvent être exclus du versionnement Git selon leur nature.
+### Responsabilités principales
+
+- `app/main.py` : routes FastAPI, monitoring, sécurité et orchestration du rebuild.
+- `app/schemas.py` : validation des entrées et sorties de l’API avec Pydantic.
+- `scripts/fetch_openagenda.py` : récupération, normalisation et préparation des événements.
+- `scripts/build_faiss_index.py` : création, vérification et sauvegarde de l’index FAISS.
+- `scripts/rag_chain.py` : logique métier du système RAG.
+- `scripts/evaluate_rag.py` : évaluation métier et Ragas.
+- `dashboard/app.py` : interface Streamlit de démonstration et de supervision.
+- `tests/` : tests unitaires et fonctionnels.
 
 ---
 
-## Installation
+## Installation et configuration
 
 ### Prérequis
 
-Le projet utilise Python 3.12 et `uv`.
-
-Vérifier les versions installées :
-
-```bash
-python --version
-uv --version
-```
-
-Environnement utilisé pendant le développement :
+Le projet utilise :
 
 ```text
 Python 3.12.12
 uv 0.9.14
+```
+
+Vérification :
+
+```bash
+python --version
+uv --version
 ```
 
 ### Installation des dépendances
@@ -190,29 +291,31 @@ Depuis la racine du projet :
 uv sync
 ```
 
-`uv` utilise `pyproject.toml` et `uv.lock` afin de reconstruire un environnement reproductible.
+Pour une installation strictement reproductible :
 
-L'environnement virtuel est créé dans :
+```bash
+uv sync --frozen
+```
+
+`uv` utilise `pyproject.toml` et `uv.lock` afin de reconstruire l’environnement Python.
+
+L’environnement virtuel est créé dans :
 
 ```text
 .venv/
 ```
 
-Ce répertoire n'est pas versionné.
+Ce dossier n’est pas versionné.
 
----
+### Variables d’environnement
 
-## Variables d'environnement
-
-Créer un fichier `.env` local à partir du modèle :
+Créer un fichier `.env` à partir du modèle :
 
 ```bash
 cp .env.example .env
 ```
 
-Les secrets doivent ensuite être renseignés uniquement dans `.env` ou dans le gestionnaire de secrets de la plateforme de déploiement.
-
-Exemple :
+Variables nécessaires :
 
 ```dotenv
 MISTRAL_API_KEY=your_mistral_api_key_here
@@ -220,23 +323,21 @@ OPENAGENDA_API_KEY=your_openagenda_api_key_here
 REBUILD_API_KEY=your_rebuild_api_key_here
 ```
 
-Le fichier `.env` ne doit jamais être versionné.
+Pour utiliser le dashboard contre l’API locale :
 
-Les clés réelles ne doivent pas apparaître dans :
+```dotenv
+API_BASE_URL=http://127.0.0.1:8000
+```
 
-- le code source ;
-- le README ;
-- les commits Git ;
-- les workflows GitHub Actions ;
-- les logs publics.
+Les valeurs réelles des secrets ne doivent jamais être ajoutées au dépôt Git.
 
 ---
 
-## Collecte des données OpenAgenda
+## Collecte et préparation des données
 
-Les événements utilisés par le POC sont récupérés depuis l'API OpenAgenda.
+### Source OpenAgenda
 
-Configuration utilisée :
+Le corpus du POC provient de :
 
 ```text
 Zone géographique : Paris
@@ -244,29 +345,11 @@ Agenda : JASS CLUB PARIS
 UID OpenAgenda : 20272888
 ```
 
-La récupération prend en charge la pagination de l'API afin de parcourir l'ensemble des événements disponibles.
+Le pipeline gère la pagination de l’API afin de récupérer l’ensemble des événements disponibles.
 
-Le pipeline utilise un `pandas.DataFrame` pour les étapes de préparation et de manipulation des données.
+### Normalisation
 
----
-
-## Filtrage temporel et géographique
-
-Les événements sont filtrés selon :
-
-- la ville : `Paris` ;
-- les 365 derniers jours ;
-- tous les événements futurs disponibles.
-
-Les dates sont normalisées afin de garantir un filtrage temporel cohérent.
-
-Ce choix permet de conserver à la fois un historique récent et les événements à venir pouvant être recommandés aux utilisateurs.
-
----
-
-## Normalisation des événements
-
-Chaque événement est transformé dans une structure homogène contenant notamment :
+Chaque événement est converti dans une structure homogène comprenant notamment :
 
 ```text
 uid
@@ -284,126 +367,176 @@ status
 embedding_text
 ```
 
-Le champ `embedding_text` constitue la représentation textuelle utilisée pour la vectorisation.
+### Champ `embedding_text`
 
-Il regroupe les informations utiles à la recherche sémantique, notamment :
+`embedding_text` rassemble les informations utiles à la recherche sémantique :
 
-- le titre ;
-- la description ;
-- le lieu ;
-- les dates ;
-- les mots-clés.
+- titre ;
+- description ;
+- adresse ;
+- ville ;
+- dates ;
+- mots-clés.
 
----
+### Filtrage
 
-## Chunking
+Les événements sont filtrés selon :
 
-Avant l'indexation, les documents peuvent être découpés avec `RecursiveCharacterTextSplitter`.
+- la ville `Paris` ;
+- une borne temporelle de 365 jours dans le passé ;
+- l’ensemble des événements futurs disponibles.
 
-Configuration utilisée :
+### Chunking
+
+Le découpage est réalisé avec `RecursiveCharacterTextSplitter`.
+
+Configuration :
 
 ```text
 chunk_size = 500
 chunk_overlap = 50
 ```
 
-Le chevauchement permet de limiter la perte de contexte entre deux fragments successifs.
+Le chevauchement limite la perte de contexte entre deux fragments successifs.
 
-Dans le corpus actuellement utilisé, la majorité des événements possède toutefois une représentation suffisamment courte pour tenir dans un seul chunk.
+Dans le corpus actuel, la majorité des événements tient toutefois dans un seul chunk.
 
 ---
 
-## Embeddings
+## Embeddings et index FAISS
 
-La vectorisation est réalisée avec Mistral AI.
+### Embeddings
 
-Modèle :
+Modèle utilisé :
 
 ```text
 mistral-embed
 ```
 
-Dimension des vecteurs :
+Dimension :
 
 ```text
 1024
 ```
 
-Les embeddings transforment les descriptions textuelles des événements en représentations numériques permettant d'effectuer une recherche par proximité sémantique.
+Les embeddings transforment le contenu textuel en vecteurs numériques qui peuvent être comparés lors de la recherche sémantique.
 
-Lors d'une exécution de référence du pipeline, environ **306 événements** ont été récupérés, filtrés et vectorisés.
+### FAISS
 
-Ce nombre peut évoluer puisque les données OpenAgenda sont dynamiques.
+L’index vectoriel est construit avec FAISS.
 
----
+Pour le volume actuel du POC, une recherche exacte est suffisante.
 
-## Base vectorielle FAISS
+Lors d’une exécution récente du pipeline :
 
-Le projet utilise FAISS comme moteur de recherche vectorielle.
+```text
+Événements : 310
+Chunks     : 310
+Vecteurs   : 310
+```
 
-L'index repose sur une recherche exacte adaptée à la taille actuelle du POC.
+Ces valeurs peuvent évoluer, car OpenAgenda est une source dynamique.
 
-Les documents LangChain associés aux vecteurs conservent les métadonnées nécessaires à l'identification des événements.
+### Persistance
 
-L'index est sauvegardé localement dans :
+L’index est enregistré dans :
 
 ```text
 data/faiss_index/
 ```
 
-avec notamment :
+avec :
 
 ```text
 index.faiss
 index.pkl
 ```
 
-`index.faiss` contient l'index vectoriel.
+`index.faiss` contient l’index vectoriel.
 
-`index.pkl` contient les informations complémentaires nécessaires à la reconstruction du VectorStore LangChain.
+`index.pkl` contient les informations complémentaires utilisées par le VectorStore LangChain.
 
-Le chargement du fichier pickle doit uniquement être effectué avec un index généré par le projet et provenant d'une source de confiance.
+Le chargement du pickle n’est autorisé que pour un index généré par le projet et provenant d’une source de confiance.
 
 ---
 
 ## Chaîne RAG
 
-La chaîne RAG est définie dans :
+### Localisation
+
+La logique métier du système est définie dans :
 
 ```text
 scripts/rag_chain.py
 ```
 
-Elle réalise les opérations suivantes :
+### Fonctions principales
 
 ```text
-Question utilisateur
-        │
-        ▼
-Embedding de la question
-        │
-        ▼
-Recherche FAISS
-        │
-        ▼
-Documents pertinents
-        │
-        ▼
-Construction du contexte
-        │
-        ▼
-Prompt RAG
-        │
-        ▼
-Mistral
-        │
-        ▼
-Réponse
+get_llm()
+get_retriever()
+retrieve_documents()
+format_document()
+format_documents()
+generate_answer()
+answer_question()
+answer_question_with_context()
+clear_retriever_cache()
 ```
 
-Le retriever FAISS est mis en cache afin d'éviter de recharger l'index à chaque requête.
+### Fonction centrale
 
-Après une reconstruction réussie de FAISS, ce cache est invalidé afin que les requêtes suivantes utilisent le nouvel index.
+`answer_question()` est le point d’entrée principal du système RAG.
+
+Son rôle est de :
+
+1. récupérer les documents les plus pertinents ;
+2. construire le contexte ;
+3. transmettre ce contexte au modèle Mistral ;
+4. renvoyer la réponse générée.
+
+### Variante pour l’évaluation
+
+`answer_question_with_context()` renvoie également les contextes récupérés.
+
+Cette information est nécessaire pour évaluer la qualité du retrieval et de la génération avec Ragas.
+
+### Séparation de la logique métier et de l’API
+
+La logique RAG n’est pas implémentée directement dans FastAPI.
+
+`app/main.py` importe et appelle les fonctions définies dans `scripts/rag_chain.py`.
+
+Architecture :
+
+```text
+POST /ask
+    │
+    ▼
+app/main.py
+    │
+    ▼
+answer_question()
+    │
+    ▼
+scripts/rag_chain.py
+    │
+    ├── Retriever FAISS
+    ├── Construction du contexte
+    └── Mistral
+```
+
+Cette séparation permet :
+
+- de tester le RAG indépendamment de l’API ;
+- de réutiliser les fonctions dans d’autres interfaces ;
+- de limiter le couplage entre logique métier et transport HTTP.
+
+### Cache du retriever
+
+Le retriever FAISS est mis en cache pour éviter de recharger l’index à chaque requête.
+
+Après une reconstruction de l’index, `clear_retriever_cache()` invalide ce cache afin que les requêtes suivantes utilisent immédiatement le nouvel index.
 
 ---
 
@@ -415,62 +548,61 @@ Le modèle de génération utilisé est :
 ministral-3b-latest
 ```
 
-Il est appelé via l'intégration LangChain/Mistral.
+Le modèle est appelé via l’intégration LangChain/Mistral.
 
-Une température faible est utilisée afin de favoriser des réponses relativement déterministes et adaptées à un système de recommandation fondé sur des données factuelles.
+Une température faible est utilisée afin de favoriser des réponses factuelles et relativement déterministes.
 
-Le prompt demande au modèle :
+Le prompt demande notamment au modèle :
 
-- de répondre à partir du contexte fourni ;
-- de ne pas inventer d'événements ;
-- de ne pas inventer de dates ou de lieux ;
-- de signaler lorsqu'aucune information pertinente n'est disponible.
+- de répondre uniquement à partir du contexte disponible ;
+- de ne pas inventer d’événements ;
+- de ne pas inventer de dates ;
+- de ne pas inventer de lieux ;
+- de signaler lorsqu’aucune information pertinente n’est disponible.
 
 ---
 
 ## API REST FastAPI
 
-Le système RAG est exposé via FastAPI.
-
-Lancer l'API localement :
+### Lancement local
 
 ```bash
 uv run uvicorn app.main:app --reload
 ```
 
-Documentation Swagger :
+API locale :
+
+```text
+http://127.0.0.1:8000
+```
+
+Swagger :
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
----
+### `GET /health`
 
-## Endpoint `/health`
-
-Permet de vérifier l'état de l'API.
+Vérifie l’état de l’API.
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Exemple de réponse :
+Exemple :
 
 ```json
 {
   "status": "ok",
   "service": "puls-events-rag-api",
-  "version": "0.2.3"
+  "version": "0.2.4"
 }
 ```
 
----
+### `POST /ask`
 
-## Endpoint `/ask`
-
-Permet d'interroger le système RAG.
-
-Exemple :
+Permet d’interroger le système RAG.
 
 ```bash
 curl -X POST \
@@ -479,7 +611,7 @@ curl -X POST \
   -d '{"question":"Je cherche un événement jazz à Paris."}'
 ```
 
-Structure de réponse :
+Réponse :
 
 ```json
 {
@@ -488,27 +620,51 @@ Structure de réponse :
 }
 ```
 
-L'endpoint valide les données d'entrée et gère également certaines erreurs provenant du service de génération.
+### Validation des entrées
 
-Une limitation temporaire du fournisseur LLM peut notamment être convertie en réponse HTTP `503 Service Unavailable`.
+Les données entrantes sont validées avec les schémas Pydantic définis dans :
+
+```text
+app/schemas.py
+```
+
+Les tests couvrent notamment :
+
+- question vide ;
+- champ `question` absent ;
+- mauvaise requête ;
+- erreur interne du RAG ;
+- limitation temporaire du fournisseur LLM.
+
+Une erreur de rate limit du fournisseur peut être traduite en :
+
+```text
+HTTP 503 Service Unavailable
+```
+
+### Endpoints complémentaires
+
+L’API expose également :
+
+```text
+GET  /metrics
+GET  /index/info
+GET  /evaluation/status
+POST /rebuild
+GET  /rebuild/status
+```
 
 ---
 
-## Reconstruction de l'index FAISS
+## Reconstruction de l’index
 
-L'API fournit un endpoint permettant de déclencher une reconstruction de l'index :
+### `POST /rebuild`
 
-```text
-POST /rebuild
-```
+L’endpoint permet de reconstruire l’index vectoriel sans bloquer la requête HTTP.
 
-Cet endpoint est protégé par la variable :
+Il est protégé par une clé dédiée.
 
-```text
-REBUILD_API_KEY
-```
-
-La clé est transmise dans le header :
+Header attendu :
 
 ```text
 X-Rebuild-Key
@@ -522,13 +678,7 @@ curl -X POST \
   -H "X-Rebuild-Key: YOUR_REBUILD_API_KEY"
 ```
 
-Une requête valide retourne :
-
-```text
-HTTP 202 Accepted
-```
-
-avec une réponse de type :
+Réponse :
 
 ```json
 {
@@ -537,57 +687,89 @@ avec une réponse de type :
 }
 ```
 
----
+Code HTTP :
 
-## Background Task
+```text
+202 Accepted
+```
 
-La reconstruction FAISS est exécutée avec les `BackgroundTasks` de FastAPI.
+### Sécurité
 
-Cela permet à `/rebuild` de répondre immédiatement en HTTP `202` sans maintenir la requête HTTP ouverte pendant toute la reconstruction.
+La clé attendue est chargée depuis :
 
-Le fonctionnement est :
+```text
+REBUILD_API_KEY
+```
+
+L’API renvoie :
+
+- `401` si la clé est absente ou incorrecte ;
+- `503` si la protection n’est pas configurée ;
+- `409` si un rebuild est déjà en cours.
+
+### Background Task
+
+FastAPI utilise `BackgroundTasks` pour exécuter la reconstruction.
 
 ```text
 POST /rebuild
       │
       ▼
-Validation X-Rebuild-Key
+Validation de X-Rebuild-Key
       │
       ▼
-HTTP 202 Accepted
+HTTP 202
       │
       ▼
 BackgroundTasks
       │
       ▼
-Collecte OpenAgenda
+OpenAgenda
+      │
+      ▼
+Prétraitement
       │
       ▼
 Embeddings
       │
       ▼
-Nouvel index FAISS
+FAISS
       │
       ▼
-Invalidation du cache Retriever
+Sauvegarde
       │
       ▼
-status = completed
+Invalidation du cache
+      │
+      ▼
+completed
 ```
 
-Une protection empêche également le lancement simultané de plusieurs reconstructions dans le même processus.
+### `GET /rebuild/status`
 
----
-
-## Endpoint `/rebuild/status`
-
-L'état de la reconstruction peut être consulté avec :
+Permet de connaître l’état du rebuild.
 
 ```bash
 curl http://127.0.0.1:8000/rebuild/status
 ```
 
-Les principaux états sont :
+Exemple :
+
+```json
+{
+  "status": "completed",
+  "started_at": "2026-09-12T14:00:00+00:00",
+  "completed_at": "2026-09-12T14:00:20+00:00",
+  "duration_seconds": 20.0,
+  "error": null,
+  "progress": 100,
+  "step": "Reconstruction FAISS terminée",
+  "processed": 310,
+  "total": 310
+}
+```
+
+### États possibles
 
 ```text
 idle
@@ -596,124 +778,248 @@ completed
 failed
 ```
 
-Exemple :
+### Progression du rebuild
 
-```json
-{
-  "status": "completed",
-  "started_at": "2026-09-10T12:00:00+00:00",
-  "completed_at": "2026-09-10T12:00:20+00:00",
-  "error": null
-}
-```
-
-En cas d'échec, le statut devient `failed` et une information d'erreur est conservée.
-
----
-
-## Limites du Background Task
-
-L'implémentation actuelle est adaptée à un POC.
-
-Le traitement de fond est exécuté dans le même environnement que l'API FastAPI.
-
-Par conséquent :
-
-- un redémarrage du conteneur pendant la reconstruction peut interrompre le traitement ;
-- l'état du rebuild est conservé en mémoire ;
-- cet état est réinitialisé lors d'un redémarrage ;
-- plusieurs workers ou plusieurs replicas ne partageraient pas automatiquement cet état.
-
-Dans une architecture de production à plus grande échelle, le traitement pourrait être externalisé vers un système de jobs ou une file de tâches avec stockage persistant.
-
----
-
-## Tests automatisés
-
-Les tests sont exécutés avec Pytest.
-
-```bash
-uv run pytest -q
-```
-
-État validé pour la version `0.2.3` :
+La version `0.2.4` expose une progression structurée :
 
 ```text
-33 passed
+5 %   Initialisation
+10 %  Récupération OpenAgenda
+25 %  Conversion des événements
+35 %  Filtrage
+45 %  Préparation des textes
+55 %  Chunking
+65 %  Embeddings + construction FAISS
+90 %  Vérification
+95 %  Sauvegarde
+100 % Reconstruction terminée
 ```
 
-Les tests couvrent notamment :
+La progression correspond aux phases réellement exécutées.
 
-- l'environnement Python ;
-- les dépendances RAG ;
-- la normalisation OpenAgenda ;
-- les données manquantes ;
-- le filtrage géographique ;
-- le filtrage temporel ;
-- la pagination OpenAgenda ;
-- la génération des embeddings ;
-- la construction des documents ;
-- l'API `/health` ;
-- l'API `/ask` ;
-- la validation des entrées ;
-- la gestion des erreurs RAG ;
-- la protection de `/rebuild` ;
-- le déclenchement du rebuild ;
-- les erreurs du rebuild ;
-- le statut de reconstruction ;
-- la prévention des reconstructions concurrentes.
+La génération des embeddings est effectuée en bloc par le VectorStore FAISS ; le pourcentage peut donc rester momentanément à `65 %` pendant cette étape.
 
-Deux avertissements de dépréciation peuvent actuellement apparaître dans l'environnement de test.
+### Limites de l’implémentation
 
-Ils ne bloquent pas l'exécution du POC.
+Cette solution est adaptée à un POC.
+
+L’état du rebuild est conservé en mémoire dans le processus FastAPI. Par conséquent :
+
+- un redémarrage du conteneur réinitialise cet état ;
+- un redémarrage pendant le traitement peut interrompre le rebuild ;
+- plusieurs replicas ne partageraient pas automatiquement le même état.
+
+Une industrialisation pourrait externaliser cette tâche dans un worker dédié avec une file de jobs et un stockage persistant.
 
 ---
 
-## Évaluation du système RAG
+## Évaluation avec Ragas
 
-Un jeu de questions d'évaluation est disponible dans :
+### Jeu d’évaluation
+
+Les scénarios sont définis dans :
 
 ```text
 data/evaluation/rag_questions.json
 ```
 
-Il contient plusieurs scénarios permettant de contrôler le comportement du système, notamment :
+Le dataset contient actuellement **7 scénarios**, comprenant :
 
-- des recherches d'événements ;
-- des contraintes de localisation ;
-- des demandes correspondant au corpus ;
-- des demandes ne correspondant pas au corpus.
+- des recherches jazz ;
+- une jam session ;
+- une soirée swing ;
+- du jazz manouche ;
+- une recherche croisant jazz et cinéma ;
+- une recherche basée sur une adresse ;
+- un scénario négatif hors corpus.
 
-Le script :
+### Script d’évaluation
 
 ```text
 scripts/evaluate_rag.py
 ```
 
-permet d'exécuter l'évaluation.
+Lancement complet :
 
-Une exécution de référence du jeu d'évaluation a obtenu :
-
-```text
-7 / 7 scénarios validés
-Score : 1.00
+```bash
+uv run python -m scripts.evaluate_rag
 ```
 
-Cette évaluation constitue une validation fonctionnelle du POC et non un benchmark exhaustif de la qualité sémantique d'un système RAG industriel.
+Lancement limité :
+
+```bash
+uv run python -m scripts.evaluate_rag --limit 1
+```
+
+### Métriques Ragas
+
+Trois métriques sont utilisées :
+
+#### Faithfulness
+
+Mesure si la réponse générée est bien soutenue par le contexte récupéré.
+
+#### Response Relevancy
+
+Mesure la pertinence de la réponse par rapport à la question utilisateur.
+
+#### LLM Context Recall
+
+Mesure si le contexte récupéré contient les informations nécessaires à la réponse attendue.
+
+### Résultats de référence
+
+Dernière évaluation complète sur 7 scénarios :
+
+```text
+Faithfulness       ≈ 0.780
+ResponseRelevancy  ≈ 0.712
+LLMContextRecall   ≈ 0.857
+```
+
+Les six scénarios positifs ont obtenu :
+
+```text
+Context Recall = 1.0
+```
+
+Le scénario négatif obtient des métriques automatiques faibles alors que le comportement métier est correct : le système refuse d’inventer un événement qui n’existe pas dans le corpus.
+
+Ce résultat illustre une limite importante des métriques automatiques : elles doivent être interprétées avec une évaluation métier et non utilisées isolément.
+
+### Résultats persistés
+
+Les résultats sont enregistrés dans :
+
+```text
+data/evaluation/ragas_results.json
+```
+
+Le fichier contient notamment :
+
+- la date de génération ;
+- les scores globaux ;
+- les scores par scénario ;
+- la réponse produite ;
+- la réponse de référence ;
+- les métriques Ragas.
+
+---
+
+## Dashboard Streamlit
+
+### Objectif
+
+Le dashboard apporte une interface de démonstration et de supervision du POC.
+
+Fichier :
+
+```text
+dashboard/app.py
+```
+
+### Lancement
+
+```bash
+uv run streamlit run dashboard/app.py
+```
+
+### Fonctionnalités
+
+Le dashboard permet de visualiser :
+
+- l’état de l’API ;
+- la version déployée ;
+- le nombre de requêtes ;
+- les temps de réponse ;
+- les erreurs ;
+- les informations sur l’index FAISS ;
+- le statut du rebuild ;
+- la progression du rebuild ;
+- les résultats Ragas ;
+- un assistant culturel connecté à `/ask`.
+
+### Onglets
+
+```text
+Vue d'ensemble
+Assistant culturel
+Évaluation Ragas
+```
+
+### API locale ou distante
+
+Pour utiliser l’API locale :
+
+```dotenv
+API_BASE_URL=http://127.0.0.1:8000
+```
+
+Le dashboard peut également cibler l’API Northflank en utilisant son URL de production.
+
+---
+
+## Tests automatisés
+
+### Exécution
+
+```bash
+uv run pytest -q
+```
+
+État validé pour la version `0.2.4` :
+
+```text
+38 passed
+```
+
+Un avertissement de dépréciation Starlette/AnyIO peut apparaître. Il n’empêche pas l’exécution du POC.
+
+### Couverture fonctionnelle
+
+Les tests couvrent notamment :
+
+- environnement Python ;
+- imports et dépendances ;
+- récupération OpenAgenda ;
+- normalisation des événements ;
+- données manquantes ;
+- pagination ;
+- filtrage temporel ;
+- filtrage géographique ;
+- construction des embeddings ;
+- création des documents ;
+- chaîne RAG ;
+- appel du retriever ;
+- génération de réponse ;
+- `/health` ;
+- `/ask` ;
+- validation Pydantic ;
+- question vide ;
+- mauvaise requête ;
+- erreurs du RAG ;
+- rate limit ;
+- protection de `/rebuild` ;
+- clé absente ;
+- clé incorrecte ;
+- rebuild en arrière-plan ;
+- erreur pendant le rebuild ;
+- rebuild concurrent ;
+- statut et progression du rebuild ;
+- préparation du dataset Ragas ;
+- logique de l’évaluation.
 
 ---
 
 ## Docker
 
-Le projet est conteneurisé avec Docker.
-
-Construire l'image :
+### Construction
 
 ```bash
 docker build -t puls-events-rag:local .
 ```
 
-Lancer le conteneur :
+### Exécution
 
 ```bash
 docker run --rm \
@@ -723,17 +1029,19 @@ docker run --rm \
   puls-events-rag:local
 ```
 
-L'API est ensuite accessible sur :
+L’API est ensuite disponible sur :
 
 ```text
 http://127.0.0.1:8000
 ```
 
-et Swagger sur :
+Swagger :
 
 ```text
 http://127.0.0.1:8000/docs
 ```
+
+### Démarrage du conteneur
 
 Le script :
 
@@ -741,23 +1049,27 @@ Le script :
 scripts/start.sh
 ```
 
-vérifie la présence de l'index FAISS au démarrage.
+vérifie la présence de l’index FAISS.
 
-Si l'index n'existe pas dans le conteneur, une reconstruction est déclenchée avant le lancement d'Uvicorn.
+Si l’index n’est pas disponible, il déclenche sa reconstruction avant le démarrage d’Uvicorn.
 
 ---
 
-## CI/CD avec GitHub Actions
+## CI/CD et déploiement
 
-Le projet dispose d'un workflow GitHub Actions dans :
+### GitHub Actions
+
+Workflow :
 
 ```text
 .github/workflows/ci.yml
 ```
 
-La CI est exécutée sur les branches principales et les Pull Requests concernées.
+### Validation sur les branches
 
-Le pipeline valide notamment :
+La CI est exécutée sur les branches et Pull Requests concernées.
+
+Chaîne principale :
 
 ```text
 Pytest
@@ -769,9 +1081,9 @@ Docker build
 Docker smoke test
 ```
 
-Lors d'une mise à jour de `main`, le workflow peut également valider le déploiement de production.
+### Validation de production
 
-Le processus cible est :
+Sur un push vers `main`, le workflow peut ensuite poursuivre avec :
 
 ```text
 Push main
@@ -789,71 +1101,71 @@ Docker smoke test
 Déploiement Northflank
    │
    ▼
-Vérification /health
+Attente de la version attendue
+   │
+   ▼
+GET /health
    │
    ▼
 POST /rebuild
    │
    ▼
-Suivi /rebuild/status
+GET /rebuild/status
    │
    ▼
-Validation du nouvel index FAISS
+Validation de FAISS
    │
    ▼
-Requête /ask en production
+POST /ask
 ```
 
-Les secrets nécessaires au workflow sont stockés dans les GitHub Actions Secrets et ne doivent jamais être écrits directement dans le fichier YAML.
+### Northflank
 
----
-
-## Déploiement Northflank
-
-Le POC est déployé sur Northflank à partir de la branche :
+Le service de production est construit depuis :
 
 ```text
 main
 ```
 
-Le déploiement utilise le `Dockerfile` du projet.
+et utilise le `Dockerfile` du projet.
 
-L'API de production expose notamment :
+Endpoints principaux exposés :
 
 ```text
 GET  /health
 POST /ask
 POST /rebuild
 GET  /rebuild/status
+GET  /metrics
+GET  /index/info
+GET  /evaluation/status
 ```
 
-Le health check permet également au pipeline de vérifier que la version attendue de l'API est effectivement déployée avant de lancer les validations de production.
-
----
-
-## Reproductibilité
-
-Pour reconstruire l'environnement :
-
-```bash
-uv sync --frozen
-```
-
-Puis exécuter les tests :
-
-```bash
-uv run pytest -q
-```
-
-Il n'est pas nécessaire de récupérer le dossier `.venv` d'une autre machine.
-
-`pyproject.toml` décrit les dépendances du projet tandis que `uv.lock` verrouille les versions nécessaires à la reproductibilité.
+Le health check permet également au workflow CI/CD de vérifier que la bonne version est effectivement déployée avant de poursuivre les tests de production.
 
 ---
 
 ## Sécurité
 
-Les éléments sensibles ou locaux ne doivent pas être versionnés.
+### Secrets
+
+Les secrets sont fournis par variables d’environnement :
+
+```text
+MISTRAL_API_KEY
+OPENAGENDA_API_KEY
+REBUILD_API_KEY
+```
+
+Ils ne doivent jamais être stockés dans :
+
+- le code ;
+- le README ;
+- les commits ;
+- les logs publics ;
+- le workflow GitHub Actions en clair.
+
+### Fichiers exclus du dépôt
 
 Exemples :
 
@@ -868,17 +1180,15 @@ __pycache__/
 htmlcov/
 ```
 
-Les secrets sont injectés via variables d'environnement.
+### Endpoint sensible
 
-En particulier :
+`POST /rebuild` est volontairement protégé par le header :
 
 ```text
-MISTRAL_API_KEY
-OPENAGENDA_API_KEY
-REBUILD_API_KEY
+X-Rebuild-Key
 ```
 
-Aucune valeur réelle de ces secrets ne doit être stockée dans le dépôt.
+Cette mesure évite qu’un utilisateur anonyme puisse déclencher une opération coûteuse de reconstruction de l’index.
 
 ---
 
@@ -899,81 +1209,57 @@ release/*
 main
 ```
 
-`develop` constitue la branche d'intégration.
+### `develop`
 
-`main` constitue la branche de production.
+Branche d’intégration des fonctionnalités terminées.
 
-Les fonctionnalités sont développées dans des branches `feature/*`, puis intégrées dans `develop`.
+### `feature/*`
 
-Une branche `release/*` permet ensuite de préparer et valider une nouvelle version avant son intégration dans `main`.
+Branches utilisées pour développer une fonctionnalité isolée.
 
----
+### `release/*`
 
-## Version actuelle
+Branches utilisées pour préparer et valider une version.
 
-Version du projet :
+### `main`
 
-```text
-0.2.3
-```
+Branche de production.
 
-Cette version introduit notamment la gestion asynchrone de la reconstruction FAISS et son intégration au workflow de validation de production.
+Les versions finalisées sont taguées afin de conserver des jalons reproductibles.
 
 ---
 
 ## Résultats du POC
 
-Le POC démontre qu'il est possible de construire une chaîne complète de recommandation d'événements basée sur une architecture RAG :
+Le projet démontre une chaîne complète allant de la donnée brute jusqu’à une API et une interface utilisateur.
 
 ```text
 OpenAgenda
     +
 Prétraitement
     +
+Chunking
+    +
 Mistral Embeddings
     +
 FAISS
     +
-LangChain
+LangChain Retriever
     +
 Mistral LLM
     +
 FastAPI
     +
+Ragas
+    +
+Streamlit
+    +
 Docker
+    +
+CI/CD
 ```
 
-Le système est capable de récupérer un corpus événementiel, l'indexer, rechercher les événements sémantiquement pertinents et générer une réponse contextualisée.
-
-L'architecture permet également de reconstruire l'index lorsque les données OpenAgenda évoluent.
-
----
-
-## Limites et perspectives
-
-Le projet reste un Proof of Concept.
-
-Les principales évolutions possibles sont :
-
-- augmenter la couverture géographique et le nombre d'agendas ;
-- enrichir les métadonnées utilisées par le retriever ;
-- ajouter des filtres structurés sur les dates et les lieux ;
-- comparer plusieurs stratégies de retrieval ;
-- mesurer plus finement la qualité sémantique des réponses ;
-- étendre le jeu d'évaluation ;
-- mettre en place un stockage persistant de l'index ;
-- externaliser les reconstructions longues vers un système de jobs ;
-- ajouter une observabilité plus complète ;
-- suivre les temps de réponse et les coûts d'inférence ;
-- mettre en place une stratégie de mise à jour périodique des événements.
-
-Pour une industrialisation, la persistance de l'index et l'exécution des tâches de reconstruction hors du processus FastAPI constitueraient deux évolutions importantes.
-
----
-
-## État du projet
-
-Les principales briques du POC sont désormais opérationnelles :
+### Fonctionnalités opérationnelles
 
 ```text
 Collecte OpenAgenda             OK
@@ -985,13 +1271,82 @@ Index FAISS                     OK
 Retriever LangChain             OK
 Chaîne RAG                      OK
 API FastAPI                     OK
-Tests automatisés               OK
-Évaluation RAG                  OK
-Docker                          OK
-CI GitHub Actions               OK
-Déploiement Northflank          OK
+Validation des entrées          OK
+Gestion des erreurs             OK
+Sécurité /rebuild               OK
 Background rebuild FAISS        OK
-Suivi du rebuild                OK
+Progression du rebuild          OK
+Évaluation métier               OK
+Évaluation Ragas                OK
+Dashboard Streamlit             OK
+Tests automatisés               OK
+Docker                          OK
+GitHub Actions                  OK
+Déploiement Northflank          OK
 ```
 
-Le projet est ainsi prêt pour la phase finale de documentation, démonstration et présentation du POC.
+Le POC est donc exploitable pour une démonstration de bout en bout et pour la soutenance du projet.
+
+---
+
+## Limites et perspectives
+
+Le projet reste volontairement un Proof of Concept.
+
+### Limites actuelles
+
+- corpus limité à une zone et un agenda principal ;
+- état du rebuild conservé en mémoire ;
+- index FAISS non persistant sur un volume distant ;
+- reconstruction exécutée dans le processus de l’API ;
+- métriques Ragas parfois peu adaptées aux scénarios négatifs ;
+- volume de données encore faible ;
+- génération dépendante des quotas du fournisseur LLM.
+
+### Évolutions possibles
+
+- intégrer plusieurs agendas ;
+- élargir la couverture géographique ;
+- ajouter des filtres structurés sur les dates et lieux ;
+- comparer plusieurs stratégies de retrieval ;
+- tester plusieurs tailles de `k` ;
+- ajouter du reranking ;
+- augmenter le jeu d’évaluation ;
+- exécuter Ragas dans un workflow dédié ;
+- persister FAISS sur un stockage durable ;
+- externaliser le rebuild vers un worker ;
+- ajouter une base de suivi des requêtes ;
+- améliorer l’observabilité ;
+- suivre les coûts d’inférence ;
+- automatiser les mises à jour périodiques du corpus.
+
+---
+
+## Version actuelle
+
+```text
+0.2.4
+```
+
+### Principales évolutions de la version `0.2.4`
+
+- intégration de **Ragas** ;
+- ajout des métriques `Faithfulness`, `ResponseRelevancy` et `LLMContextRecall` ;
+- ajout de `ragas_results.json` ;
+- ajout du dashboard **Streamlit** ;
+- ajout de l’endpoint `/evaluation/status` ;
+- suivi du rebuild FAISS par étapes ;
+- ajout des champs `progress`, `step`, `processed` et `total` ;
+- affichage de la progression dans le dashboard ;
+- extension des tests automatisés ;
+- alignement de la version API, Docker, CI/CD et documentation.
+
+---
+
+## Conclusion
+
+Puls-Events RAG démontre qu’il est possible de construire un assistant culturel spécialisé en combinant recherche vectorielle et génération augmentée.
+
+Le système ne se limite pas à une démonstration du modèle de langage : il couvre tout le cycle technique du POC, depuis la collecte des données OpenAgenda jusqu’à leur indexation, leur interrogation, l’exposition du service via FastAPI, son évaluation avec Ragas, sa supervision avec Streamlit et son déploiement conteneurisé.
+
+L’architecture reste volontairement simple et explicable, tout en séparant clairement la logique métier RAG de la couche API. Elle constitue ainsi une base cohérente pour une démonstration, une soutenance et une future industrialisation.
