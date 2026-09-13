@@ -6,18 +6,37 @@ import streamlit as st
 from dotenv import load_dotenv
 
 
+# -------------------------------------------------------------------
+# Configuration
+# -------------------------------------------------------------------
+
 load_dotenv()
 
 
-API_BASE_URL = os.getenv(
-    "API_BASE_URL",
-    "https://p01--p9bot--wd4gpkqcrlm8.code.run",
+def normalize_base_url(url: str) -> str:
+    """Supprime le slash final éventuel de l'URL de l'API."""
+
+    return url.rstrip("/")
+
+
+API_BASE_URL = normalize_base_url(
+    os.getenv(
+        "API_BASE_URL",
+        "https://p01--p9bot--wd4gpkqcrlm8.code.run",
+    )
 )
 
 REBUILD_API_KEY = os.getenv(
     "REBUILD_API_KEY"
 )
 
+SWAGGER_URL = f"{API_BASE_URL}/docs"
+OPENAPI_URL = f"{API_BASE_URL}/openapi.json"
+
+
+# -------------------------------------------------------------------
+# Configuration Streamlit
+# -------------------------------------------------------------------
 
 st.set_page_config(
     page_title="Puls-Events RAG",
@@ -33,6 +52,10 @@ st.caption(
     "du système de recommandation culturelle."
 )
 
+
+# -------------------------------------------------------------------
+# Appels API
+# -------------------------------------------------------------------
 
 def get_endpoint(
     path: str,
@@ -130,6 +153,10 @@ def ask_rag(
     return response.json()
 
 
+# -------------------------------------------------------------------
+# Fonctions utilitaires
+# -------------------------------------------------------------------
+
 def format_timestamp(
     value: str | None,
 ) -> str:
@@ -152,6 +179,7 @@ def clamp_progress(
 
     try:
         progress = int(value)
+
     except (
         TypeError,
         ValueError,
@@ -167,14 +195,23 @@ def clamp_progress(
     )
 
 
-overview_tab, assistant_tab, ragas_tab = st.tabs(
+# -------------------------------------------------------------------
+# Onglets
+# -------------------------------------------------------------------
+
+overview_tab, assistant_tab, ragas_tab, docs_tab = st.tabs(
     [
         "Vue d'ensemble",
         "Assistant culturel",
         "Évaluation Ragas",
+        "Documentation API",
     ]
 )
 
+
+# ===================================================================
+# ONGLET : VUE D'ENSEMBLE
+# ===================================================================
 
 with overview_tab:
     st.subheader(
@@ -231,6 +268,10 @@ with overview_tab:
         )
 
     st.divider()
+
+    # ---------------------------------------------------------------
+    # Monitoring RAG
+    # ---------------------------------------------------------------
 
     st.subheader(
         "Monitoring RAG"
@@ -347,6 +388,10 @@ with overview_tab:
 
     st.divider()
 
+    # ---------------------------------------------------------------
+    # Index FAISS
+    # ---------------------------------------------------------------
+
     st.subheader(
         "Index FAISS"
     )
@@ -406,6 +451,10 @@ with overview_tab:
         )
 
     st.divider()
+
+    # ---------------------------------------------------------------
+    # Reconstruction FAISS
+    # ---------------------------------------------------------------
 
     st.subheader(
         "Reconstruction FAISS"
@@ -608,6 +657,10 @@ with overview_tab:
         st.rerun()
 
 
+# ===================================================================
+# ONGLET : ASSISTANT CULTUREL
+# ===================================================================
+
 with assistant_tab:
     st.subheader(
         "Assistant culturel"
@@ -664,6 +717,10 @@ with assistant_tab:
                         str(exc)
                     )
 
+
+# ===================================================================
+# ONGLET : ÉVALUATION RAGAS
+# ===================================================================
 
 with ragas_tab:
     st.subheader(
@@ -870,6 +927,584 @@ with ragas_tab:
             str(exc)
         )
 
+
+# ===================================================================
+# ONGLET : DOCUMENTATION API
+# ===================================================================
+
+with docs_tab:
+    st.subheader(
+        "Documentation API"
+    )
+
+    st.write(
+        "Documentation technique de l'API REST FastAPI "
+        "exposant le système RAG Puls-Events."
+    )
+
+    st.info(
+        f"API actuellement utilisée : {API_BASE_URL}"
+    )
+
+    # ---------------------------------------------------------------
+    # Accès documentation
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Accès à la documentation interactive"
+    )
+
+    col1, col2 = st.columns(
+        2
+    )
+
+    with col1:
+        st.link_button(
+            "Ouvrir Swagger UI",
+            SWAGGER_URL,
+            use_container_width=True,
+        )
+
+    with col2:
+        st.link_button(
+            "Ouvrir OpenAPI JSON",
+            OPENAPI_URL,
+            use_container_width=True,
+        )
+
+    st.caption(
+        "Swagger UI permet de consulter et tester "
+        "directement les endpoints FastAPI."
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Informations API
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Informations API"
+    )
+
+    try:
+        docs_health = get_api_health()
+
+        col1, col2, col3 = st.columns(
+            3
+        )
+
+        col1.metric(
+            "Service",
+            docs_health.get(
+                "service",
+                "unknown",
+            ),
+        )
+
+        col2.metric(
+            "Version",
+            docs_health.get(
+                "version",
+                "unknown",
+            ),
+        )
+
+        col3.metric(
+            "État",
+            docs_health.get(
+                "status",
+                "unknown",
+            ),
+        )
+
+    except httpx.HTTPError:
+        st.warning(
+            "Les informations live de l'API "
+            "ne sont actuellement pas disponibles."
+        )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Architecture
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Architecture du système"
+    )
+
+    st.code(
+        """
+OpenAgenda API
+      |
+      v
+Prétraitement des événements
+      |
+      v
+Découpage en chunks
+      |
+      v
+Mistral Embeddings
+      |
+      v
+FAISS IndexFlatL2
+      |
+      v
+Retriever LangChain
+      |
+      v
+Mistral LLM
+      |
+      v
+FastAPI REST API
+      |
+      +----> Streamlit Dashboard
+      |
+      +----> Swagger UI
+        """,
+        language="text",
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Endpoints
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Endpoints disponibles"
+    )
+
+    endpoints = [
+        {
+            "Méthode": "GET",
+            "Endpoint": "/",
+            "Fonction": "Redirection vers Swagger UI",
+            "Accès": "Public",
+        },
+        {
+            "Méthode": "GET",
+            "Endpoint": "/health",
+            "Fonction": "État de santé de l'API",
+            "Accès": "Public",
+        },
+        {
+            "Méthode": "POST",
+            "Endpoint": "/ask",
+            "Fonction": "Interrogation du système RAG",
+            "Accès": "Public",
+        },
+        {
+            "Méthode": "GET",
+            "Endpoint": "/metrics",
+            "Fonction": "Métriques runtime du RAG",
+            "Accès": "Public",
+        },
+        {
+            "Méthode": "GET",
+            "Endpoint": "/index/info",
+            "Fonction": "Informations sur l'index FAISS",
+            "Accès": "Public",
+        },
+        {
+            "Méthode": "GET",
+            "Endpoint": "/evaluation/status",
+            "Fonction": "Résultats de l'évaluation Ragas",
+            "Accès": "Public",
+        },
+        {
+            "Méthode": "POST",
+            "Endpoint": "/rebuild",
+            "Fonction": "Reconstruction de l'index FAISS",
+            "Accès": "X-Rebuild-Key",
+        },
+        {
+            "Méthode": "GET",
+            "Endpoint": "/rebuild/status",
+            "Fonction": "Progression du rebuild FAISS",
+            "Accès": "Public",
+        },
+    ]
+
+    st.dataframe(
+        endpoints,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Exemple endpoint /ask
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Exemple : POST /ask"
+    )
+
+    st.markdown(
+        "L'endpoint `/ask` reçoit une question utilisateur "
+        "et retourne une réponse générée à partir des "
+        "documents récupérés dans FAISS."
+    )
+
+    st.markdown(
+        "**Corps de la requête :**"
+    )
+
+    st.code(
+        """{
+  "question": "Je cherche un événement jazz à Paris."
+}""",
+        language="json",
+    )
+
+    st.markdown(
+        "**Exemple de réponse :**"
+    )
+
+    st.code(
+        """{
+  "question": "Je cherche un événement jazz à Paris.",
+  "answer": "Réponse générée par le système RAG..."
+}""",
+        language="json",
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Endpoint rebuild
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Reconstruction de l'index"
+    )
+
+    st.markdown(
+        """
+L'endpoint `POST /rebuild` lance une reconstruction
+de l'index FAISS en tâche d'arrière-plan.
+
+Cet endpoint est protégé par le header :
+
+`X-Rebuild-Key`
+
+La clé n'est jamais affichée dans le dashboard.
+        """
+    )
+
+    st.code(
+        """POST /rebuild
+X-Rebuild-Key: ********""",
+        language="text",
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Pipeline RAG
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Pipeline RAG"
+    )
+
+    st.markdown(
+        """
+**1. Source de données**
+Les événements culturels sont récupérés depuis OpenAgenda.
+
+**2. Prétraitement**
+Les événements sont normalisés, filtrés puis transformés
+en documents exploitables par LangChain.
+
+**3. Chunking**
+Les documents sont découpés avec
+`RecursiveCharacterTextSplitter`.
+
+**4. Vectorisation**
+Les textes sont vectorisés avec `mistral-embed`.
+
+**5. Base vectorielle**
+Les embeddings sont stockés dans un index FAISS
+`IndexFlatL2`.
+
+**6. Retrieval**
+LangChain recherche les documents les plus proches
+de la question utilisateur.
+
+**7. Génération augmentée**
+Les documents retrouvés sont transmis au modèle Mistral
+avec la question de l'utilisateur.
+
+**8. Exposition**
+FastAPI expose le système RAG via `/ask`.
+
+**9. Monitoring et démonstration**
+Streamlit fournit une interface de démonstration,
+de monitoring et de visualisation des évaluations.
+        """
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # FAISS live
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Index FAISS actuellement chargé"
+    )
+
+    try:
+        docs_index = get_index_info()
+
+        col1, col2, col3 = st.columns(
+            3
+        )
+
+        col1.metric(
+            "Vecteurs",
+            docs_index.get(
+                "vectors",
+                0,
+            ),
+        )
+
+        col2.metric(
+            "Dimension",
+            docs_index.get(
+                "dimension",
+                0,
+            ),
+        )
+
+        col3.metric(
+            "Type",
+            docs_index.get(
+                "index_type",
+                "unknown",
+            ),
+        )
+
+    except httpx.HTTPError:
+        st.warning(
+            "Impossible de récupérer les informations "
+            "live de l'index FAISS."
+        )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Ragas
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Évaluation de la qualité"
+    )
+
+    st.markdown(
+        """
+Le système est évalué avec **Ragas**.
+
+Les principales métriques utilisées sont :
+
+- **Faithfulness** : vérifie que la réponse reste fidèle au contexte.
+- **Answer relevancy** : mesure la pertinence de la réponse.
+- **Context recall** : mesure la capacité du retriever à retrouver
+  les informations nécessaires.
+        """
+    )
+
+    try:
+        docs_evaluation = get_evaluation_status()
+
+        if docs_evaluation.get(
+            "results_available"
+        ):
+            docs_summary = docs_evaluation.get(
+                "summary",
+                {},
+            )
+
+            col1, col2, col3 = st.columns(
+                3
+            )
+
+            col1.metric(
+                "Faithfulness",
+                f"{docs_summary.get('faithfulness', 0.0):.3f}",
+            )
+
+            col2.metric(
+                "Answer relevancy",
+                f"{docs_summary.get('answer_relevancy', 0.0):.3f}",
+            )
+
+            col3.metric(
+                "Context recall",
+                f"{docs_summary.get('context_recall', 0.0):.3f}",
+            )
+
+    except httpx.HTTPError:
+        st.caption(
+            "Résultats Ragas momentanément indisponibles."
+        )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Technologies
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Technologies"
+    )
+
+    tech1, tech2, tech3, tech4 = st.columns(
+        4
+    )
+
+    tech1.metric(
+        "API",
+        "FastAPI",
+    )
+
+    tech2.metric(
+        "Vector DB",
+        "FAISS",
+    )
+
+    tech3.metric(
+        "LLM",
+        "Mistral",
+    )
+
+    tech4.metric(
+        "Framework RAG",
+        "LangChain",
+    )
+
+    tech1, tech2, tech3, tech4 = st.columns(
+        4
+    )
+
+    tech1.metric(
+        "Dashboard",
+        "Streamlit",
+    )
+
+    tech2.metric(
+        "Évaluation",
+        "Ragas",
+    )
+
+    tech3.metric(
+        "Conteneur",
+        "Docker",
+    )
+
+    tech4.metric(
+        "Déploiement",
+        "Northflank",
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # CI/CD
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "CI/CD"
+    )
+
+    st.code(
+        """
+Git push / Pull Request
+        |
+        v
+Pytest
+        |
+        v
+Docker build
+        |
+        v
+Merge sur main
+        |
+        v
+Déploiement Northflank
+        |
+        v
+Attente de la nouvelle version
+        |
+        v
+Rebuild FAISS
+        |
+        v
+Test du bot en production
+        """,
+        language="text",
+    )
+
+    st.markdown(
+        """
+Le pipeline vérifie automatiquement :
+
+- les tests Python ;
+- la construction de l'image Docker ;
+- le déploiement de la version principale ;
+- la disponibilité de l'API ;
+- la reconstruction de l'index FAISS ;
+- le fonctionnement du bot en production.
+        """
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------------
+    # Liens finaux
+    # ---------------------------------------------------------------
+
+    st.subheader(
+        "Documentation interactive"
+    )
+
+    st.write(
+        "Pour consulter les schémas Pydantic, les paramètres, "
+        "les codes HTTP et tester directement les endpoints :"
+    )
+
+    col1, col2 = st.columns(
+        2
+    )
+
+    with col1:
+        st.link_button(
+            "Swagger UI",
+            SWAGGER_URL,
+            use_container_width=True,
+        )
+
+    with col2:
+        st.link_button(
+            "Spécification OpenAPI",
+            OPENAPI_URL,
+            use_container_width=True,
+        )
+
+    st.caption(
+        "La spécification OpenAPI complète et les schémas "
+        "des requêtes/réponses sont générés automatiquement "
+        "par FastAPI."
+    )
+
+
+# -------------------------------------------------------------------
+# Footer
+# -------------------------------------------------------------------
 
 st.divider()
 

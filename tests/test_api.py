@@ -32,7 +32,7 @@ def test_health_endpoint() -> None:
 
     assert payload["status"] == "ok"
     assert payload["service"] == "puls-events-rag-api"
-    assert payload["version"] == "0.2.5"
+    assert payload["version"] == "0.2.6"
     assert payload["timestamp"]
 
 
