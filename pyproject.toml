@@ -12,7 +12,7 @@ dependencies = [
     "pandas>=3.0.5",
     "pandas-stubs~=3.0.5",
     "python-dotenv>=1.2.3",
-    "ragas==0.3.9",
+    "ragas==0.4.3",
     "requests>=2.34.2",
     "streamlit>=1.63.0",
     "uvicorn[standard]>=0.52.4",
