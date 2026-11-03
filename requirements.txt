@@ -350,7 +350,7 @@ pyyaml==6.0.3
     #   langchain-community
     #   langchain-core
     #   uvicorn
-ragas==0.3.9
+ragas==0.4.3
     # via puls-events-rag
 referencing==0.37.0
     # via
@@ -465,7 +465,7 @@ typing-inspection==0.4.4
     #   pydantic-settings
 tzdata==2026.3 ; sys_platform == 'emscripten' or sys_platform == 'win32'
     # via pandas
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   instructor
     #   requests
